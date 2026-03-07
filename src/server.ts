@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { database } from './config/database';
+import authRoutes from './routes/authRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -26,6 +27,9 @@ app.use(morgan('combined'));
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Authentication routes
+app.use('/auth', authRoutes);
 
 // Health check endpoint
 app.get('/health', async (req: Request, res: Response) => {
@@ -55,7 +59,12 @@ app.get('/', (req: Request, res: Response) => {
   res.json({
     message: 'Project SpecKit - Authentication System',
     status: 'running',
-    version: '1.0.0'
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      auth: '/auth',
+      authHealth: '/auth/health'
+    }
   });
 });
 
