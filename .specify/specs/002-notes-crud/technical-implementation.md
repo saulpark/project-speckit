@@ -1,356 +1,880 @@
 # Notes CRUD Operations - Technical Implementation
 
-## Database Schema
+## Technology Stack
 
-### Note Model (SQLAlchemy)
-```python
-class Note(db.Model):
-    __tablename__ = 'notes'
+### Core Dependencies
+- **Mongoose**: MongoDB ODM for note document modeling
+- **express-validator**: Input validation for note content and metadata
+- **Quill.js**: Rich text editor for Delta format content
+- **helmet**: Security middleware for content protection
 
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=True)  # Optional title
-    content_delta = db.Column(db.JSON, nullable=False)  # Rich text as JSON
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+### Database Implementation (MongoDB)
 
-    # Foreign key to User
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    user = db.relationship('User', backref=db.backref('notes', lazy=True))
-```
-
-### Database Relationships
-- **One-to-Many**: User → Notes (one user owns many notes)
-- **Foreign Key**: `user_id` references `users.id`
-- **Cascade Behavior**: On user deletion, handle note orphaning (TBD)
-
-## Route Implementation
-
-### Blueprint Structure
-```python
-# app/notes/__init__.py
-notes_bp = Blueprint('notes', __name__, url_prefix='/notes')
-
-# Routes:
-# /notes/ - GET (list user's notes)
-# /notes/new - GET (form), POST (create)
-# /notes/<int:id> - GET (view note)
-# /notes/<int:id>/edit - GET (form), POST (update)
-# /notes/<int:id>/delete - POST (delete)
-```
-
-### Route Protection
-- **All routes protected**: Require `@login_required`
-- **Ownership enforcement**: Helper function `_get_user_note_or_404(note_id)`
-- **Authorization pattern**: Check `note.user_id == current_user.id`
-
-## Form Implementation (WTForms)
-
-### Note Creation/Edit Form
-```python
-class NoteForm(FlaskForm):
-    title = StringField('Title', validators=[Length(max=200)])
-    content = TextAreaField('Content', validators=[DataRequired()])
-    submit = SubmitField('Save Note')
-
-    def validate_content(self, content):
-        # Validate JSON structure for content_delta
-        try:
-            json.loads(content.data)
-        except ValueError:
-            raise ValidationError('Invalid content format')
-```
-
-### Delete Confirmation Form
-```python
-class DeleteForm(FlaskForm):
-    submit = SubmitField('Delete Note')
-```
-
-## Content Storage Implementation
-
-### Rich Text Storage (JSON Delta)
-- **Format**: Quill.js Delta format for rich text
-- **Storage**: JSON column in PostgreSQL/SQLite
-- **Fallback**: Plain text conversion for simple content
-- **Validation**: JSON schema validation on save
-
-#### Example Content Delta Structure
-```json
-{
-    "ops": [
-        {"insert": "Hello "},
-        {"insert": "World", "attributes": {"bold": true}},
-        {"insert": "\n"}
-    ]
-}
-```
-
-### Content Processing
-```python
-def process_content(raw_content):
-    """Convert form content to Delta JSON"""
-    if isinstance(raw_content, str):
-        # Simple text → basic delta
-        return {"ops": [{"insert": raw_content + "\n"}]}
-    return raw_content  # Already in delta format
-
-def render_content(content_delta):
-    """Convert Delta JSON to HTML for display"""
-    # Implementation depends on chosen renderer
-    pass
-```
-
-## Database Operations
-
-### Query Patterns
-
-#### List User Notes
-```python
-@notes_bp.route('/')
-@login_required
-def list_notes():
-    notes = Note.query.filter_by(user_id=current_user.id)\
-                     .order_by(Note.updated_at.desc())\
-                     .paginate(page=page, per_page=20)
-    return render_template('notes/list.html', notes=notes)
-```
-
-#### Get User's Note or 404
-```python
-def _get_user_note_or_404(note_id):
-    note = Note.query.filter_by(
-        id=note_id,
-        user_id=current_user.id
-    ).first()
-    if not note:
-        abort(404)
-    return note
-```
-
-#### Create Note
-```python
-@notes_bp.route('/new', methods=['POST'])
-@login_required
-def create_note():
-    form = NoteForm()
-    if form.validate_on_submit():
-        note = Note(
-            title=form.title.data or "Untitled",
-            content_delta=process_content(form.content.data),
-            user_id=current_user.id
-        )
-        db.session.add(note)
-        db.session.commit()
-        return redirect(url_for('notes.view_note', id=note.id))
-```
-
-#### Update Note
-```python
-@notes_bp.route('/<int:id>/edit', methods=['POST'])
-@login_required
-def update_note(id):
-    note = _get_user_note_or_404(id)
-    form = NoteForm(obj=note)
-    if form.validate_on_submit():
-        note.title = form.title.data or "Untitled"
-        note.content_delta = process_content(form.content.data)
-        note.updated_at = datetime.utcnow()
-        db.session.commit()
-        return redirect(url_for('notes.view_note', id=note.id))
-```
-
-#### Delete Note
-```python
-@notes_bp.route('/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_note(id):
-    note = _get_user_note_or_404(id)
-    db.session.delete(note)
-    db.session.commit()
-    return redirect(url_for('notes.list_notes'))
-```
-
-## Template Implementation
-
-### Template Structure
-```
-app/templates/notes/
-├── list.html          # Note listing with pagination
-├── view.html          # Single note display
-├── new.html           # Note creation form
-├── edit.html          # Note editing form
-└── _note_form.html    # Shared form template
-```
-
-### Template Patterns
-
-#### Note List Template
-```html
-<!-- Pagination with Flask-SQLAlchemy -->
-{% for note in notes.items %}
-    <div class="note-card">
-        <h5>{{ note.title or "Untitled" }}</h5>
-        <p>{{ moment(note.updated_at).fromNow() }}</p>
-        <a href="{{ url_for('notes.view_note', id=note.id) }}">View</a>
-    </div>
-{% endfor %}
-{{ render_pagination(notes) }}
-```
-
-#### Content Rendering
-```html
-<!-- Convert Delta JSON to HTML -->
-<div class="note-content">
-    {{ render_delta_content(note.content_delta) | safe }}
-</div>
-```
-
-## Rich Text Editor Integration
-
-### Quill.js Implementation (Future Enhancement)
+#### Note Schema (Mongoose)
 ```javascript
-// Initialize Quill editor
-var quill = new Quill('#editor', {
-    theme: 'snow',
-    modules: {
-        toolbar: [
-            ['bold', 'italic', 'underline'],
-            ['link', 'blockquote', 'code-block'],
-            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-            ['clean']
-        ]
-    }
+import mongoose from 'mongoose';
+
+const noteSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true
+  },
+  title: {
+    type: String,
+    maxLength: 200,
+    trim: true,
+    default: 'Untitled'
+  },
+  content: {
+    type: {
+      type: String,
+      enum: ['delta', 'plain'],
+      default: 'delta'
+    },
+    data: mongoose.Schema.Types.Mixed, // Flexible for Delta JSON or plain text
+    preview: String // Generated excerpt for lists
+  },
+  isPublic: {
+    type: Boolean,
+    default: false
+  },
+  tags: [{
+    type: String,
+    trim: true,
+    lowercase: true
+  }]
+}, {
+  timestamps: true // Adds createdAt and updatedAt
 });
 
-// Form submission
-document.querySelector('form').onsubmit = function() {
-    var content = document.querySelector('input[name=content]');
-    content.value = JSON.stringify(quill.getContents());
+// Indexes for performance
+noteSchema.index({ userId: 1, updatedAt: -1 });
+noteSchema.index({ userId: 1, title: 'text', 'content.preview': 'text' });
+noteSchema.index({ isPublic: 1, updatedAt: -1 });
+
+export const Note = mongoose.model('Note', noteSchema);
+```
+
+### Docker Integration
+
+#### Updated docker-compose.yml
+```yaml
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongo:27017/projectspeckit
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    environment:
+      - MONGO_INITDB_DATABASE=projectspeckit
+
+volumes:
+  mongo_data:
+```
+
+## Express Route Implementation
+
+### Notes Router Structure
+```javascript
+// routes/notes.ts
+import express from 'express';
+import { noteController } from '../controllers/noteController';
+import { authenticateToken } from '../middleware/auth';
+import { validateNote, validateNoteUpdate } from '../middleware/validation';
+
+const router = express.Router();
+
+// All note routes require authentication
+router.use(authenticateToken);
+
+// API routes
+router.get('/', noteController.listNotes);
+router.post('/', validateNote, noteController.createNote);
+router.get('/:id', noteController.getNote);
+router.put('/:id', validateNoteUpdate, noteController.updateNote);
+router.delete('/:id', noteController.deleteNote);
+
+// UI routes
+router.get('/new', noteController.getCreateForm);
+router.get('/:id/edit', noteController.getEditForm);
+
+export { router as noteRouter };
+```
+
+### Note Ownership Middleware
+```javascript
+// middleware/noteOwnership.ts
+import { Request, Response, NextFunction } from 'express';
+import { Note } from '../models/Note';
+
+interface AuthenticatedRequest extends Request {
+  user?: any;
+  note?: any;
+}
+
+export const verifyNoteOwnership = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const note = await Note.findById(req.params.id);
+
+    if (!note) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+
+    // Check ownership (hide existence from other users)
+    if (note.userId.toString() !== req.user._id.toString()) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+
+    req.note = note;
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Server error' });
+  }
 };
 ```
 
-### Fallback for Plain Text
-- **Textarea**: Default form input for content
-- **Conversion**: Plain text → basic Delta format
-- **Progressive Enhancement**: Rich editor when JavaScript available
+## Content Management
+
+### Delta Content Processing
+```javascript
+// utils/contentProcessor.ts
+export class ContentProcessor {
+
+  // Convert plain text to Delta format
+  static textToDelta(text: string): object {
+    return {
+      ops: [{ insert: text + '\n' }]
+    };
+  }
+
+  // Validate Delta format
+  static validateDelta(delta: any): boolean {
+    try {
+      return (
+        delta &&
+        Array.isArray(delta.ops) &&
+        delta.ops.every((op: any) =>
+          typeof op === 'object' &&
+          typeof op.insert === 'string'
+        )
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  // Generate preview text from Delta
+  static deltaToPreview(delta: any, maxLength: number = 200): string {
+    try {
+      const text = delta.ops
+        .map((op: any) => op.insert || '')
+        .join('')
+        .replace(/\n/g, ' ')
+        .trim();
+
+      return text.length > maxLength
+        ? text.substring(0, maxLength) + '...'
+        : text;
+    } catch {
+      return 'No content preview available';
+    }
+  }
+
+  // Sanitize content for security
+  static sanitizeContent(content: any): any {
+    // Remove any potentially dangerous operations
+    if (content.ops) {
+      return {
+        ops: content.ops.map((op: any) => ({
+          insert: typeof op.insert === 'string' ? op.insert : '',
+          attributes: this.sanitizeAttributes(op.attributes)
+        }))
+      };
+    }
+    return content;
+  }
+
+  private static sanitizeAttributes(attrs: any): any {
+    if (!attrs || typeof attrs !== 'object') return undefined;
+
+    // Whitelist safe attributes
+    const safeAttrs = ['bold', 'italic', 'underline', 'link', 'list'];
+    const sanitized: any = {};
+
+    Object.keys(attrs).forEach(key => {
+      if (safeAttrs.includes(key)) {
+        sanitized[key] = attrs[key];
+      }
+    });
+
+    return Object.keys(sanitized).length > 0 ? sanitized : undefined;
+  }
+}
+```
+
+## Input Validation
+
+### Note Validation Middleware
+```javascript
+// middleware/noteValidation.ts
+import { body, validationResult } from 'express-validator';
+import { Request, Response, NextFunction } from 'express';
+import { ContentProcessor } from '../utils/contentProcessor';
+
+export const validateNote = [
+  body('title')
+    .optional()
+    .isLength({ max: 200 })
+    .withMessage('Title must be 200 characters or less')
+    .trim(),
+
+  body('content.data')
+    .custom((value, { req }) => {
+      const contentType = req.body?.content?.type || 'delta';
+
+      if (contentType === 'delta') {
+        if (!ContentProcessor.validateDelta(value)) {
+          throw new Error('Invalid Delta format');
+        }
+      } else if (contentType === 'plain') {
+        if (typeof value !== 'string') {
+          throw new Error('Plain content must be a string');
+        }
+      }
+
+      return true;
+    }),
+
+  body('content.type')
+    .optional()
+    .isIn(['delta', 'plain'])
+    .withMessage('Content type must be delta or plain'),
+
+  handleValidationErrors
+];
+
+export const validateNoteUpdate = [
+  body('title')
+    .optional()
+    .isLength({ max: 200 })
+    .trim(),
+
+  body('content')
+    .optional()
+    .custom((value) => {
+      if (value && value.data) {
+        const contentType = value.type || 'delta';
+        if (contentType === 'delta' && !ContentProcessor.validateDelta(value.data)) {
+          throw new Error('Invalid Delta format');
+        }
+      }
+      return true;
+    }),
+
+  handleValidationErrors
+];
+
+function handleValidationErrors(req: Request, res: Response, next: NextFunction) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+}
+```
+
+## Service Layer
+
+### Note Service
+```javascript
+// services/noteService.ts
+import { Note } from '../models/Note';
+import { ContentProcessor } from '../utils/contentProcessor';
+import { Types } from 'mongoose';
+
+export class NoteService {
+
+  static async createNote(userId: string, noteData: any) {
+    const { title, content } = noteData;
+
+    // Process content based on type
+    let processedContent = content;
+    if (content.type === 'plain') {
+      processedContent = {
+        type: 'delta',
+        data: ContentProcessor.textToDelta(content.data)
+      };
+    } else if (content.type === 'delta') {
+      processedContent.data = ContentProcessor.sanitizeContent(content.data);
+    }
+
+    // Generate preview
+    const preview = ContentProcessor.deltaToPreview(processedContent.data);
+
+    const note = new Note({
+      userId: new Types.ObjectId(userId),
+      title: title || 'Untitled',
+      content: {
+        ...processedContent,
+        preview
+      }
+    });
+
+    return await note.save();
+  }
+
+  static async getUserNotes(userId: string, options: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    search?: string;
+  } = {}) {
+    const {
+      page = 1,
+      limit = 20,
+      sortBy = '-updatedAt',
+      search
+    } = options;
+
+    const query: any = { userId: new Types.ObjectId(userId) };
+
+    // Add search if provided
+    if (search) {
+      query.$text = { $search: search };
+    }
+
+    const notes = await Note
+      .find(query)
+      .sort(sortBy)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select('title content.preview createdAt updatedAt')
+      .lean();
+
+    const total = await Note.countDocuments(query);
+
+    return {
+      notes,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  }
+
+  static async getNoteById(noteId: string, userId: string) {
+    const note = await Note.findOne({
+      _id: new Types.ObjectId(noteId),
+      userId: new Types.ObjectId(userId)
+    });
+
+    if (!note) {
+      throw new Error('Note not found');
+    }
+
+    return note;
+  }
+
+  static async updateNote(noteId: string, userId: string, updateData: any) {
+    const note = await this.getNoteById(noteId, userId);
+
+    if (updateData.title !== undefined) {
+      note.title = updateData.title || 'Untitled';
+    }
+
+    if (updateData.content) {
+      let processedContent = updateData.content;
+
+      if (updateData.content.type === 'plain') {
+        processedContent = {
+          type: 'delta',
+          data: ContentProcessor.textToDelta(updateData.content.data)
+        };
+      } else if (updateData.content.data) {
+        processedContent.data = ContentProcessor.sanitizeContent(updateData.content.data);
+      }
+
+      note.content = {
+        ...processedContent,
+        preview: ContentProcessor.deltaToPreview(processedContent.data)
+      };
+    }
+
+    note.updatedAt = new Date();
+    return await note.save();
+  }
+
+  static async deleteNote(noteId: string, userId: string) {
+    const result = await Note.deleteOne({
+      _id: new Types.ObjectId(noteId),
+      userId: new Types.ObjectId(userId)
+    });
+
+    if (result.deletedCount === 0) {
+      throw new Error('Note not found');
+    }
+
+    return { deleted: true };
+  }
+}
+```
+
+## Template Implementation (Handlebars)
+
+### Note List Template
+```handlebars
+<!-- views/notes/list.hbs -->
+<div class="container">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>My Notes</h1>
+    <a href="/notes/new" class="btn btn-primary">
+      <i class="bi bi-plus-circle"></i> New Note
+    </a>
+  </div>
+
+  {{#if search}}
+    <div class="mb-3">
+      <small class="text-muted">Search results for "{{search}}"</small>
+    </div>
+  {{/if}}
+
+  <div class="row">
+    {{#each notes}}
+      <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card h-100">
+          <div class="card-body">
+            <h5 class="card-title">{{this.title}}</h5>
+            <p class="card-text">{{this.content.preview}}</p>
+            <small class="text-muted">
+              Updated {{formatDate this.updatedAt}}
+            </small>
+          </div>
+          <div class="card-footer">
+            <a href="/notes/{{this._id}}" class="btn btn-sm btn-outline-primary">View</a>
+            <a href="/notes/{{this._id}}/edit" class="btn btn-sm btn-outline-secondary">Edit</a>
+          </div>
+        </div>
+      </div>
+    {{else}}
+      <div class="col-12">
+        <div class="text-center py-5">
+          <i class="bi bi-journal-text fs-1 text-muted"></i>
+          <h3 class="mt-3">No notes yet</h3>
+          <p class="text-muted">Create your first note to get started</p>
+          <a href="/notes/new" class="btn btn-primary">Create Note</a>
+        </div>
+      </div>
+    {{/each}}
+  </div>
+
+  {{#if pagination.pages}}
+    {{> pagination pagination=pagination }}
+  {{/if}}
+</div>
+```
+
+### Rich Text Editor Integration
+```handlebars
+<!-- views/notes/edit.hbs -->
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <form id="noteForm" method="POST" action="/notes{{#if note._id}}/{{note._id}}{{/if}}">
+        {{#if note._id}}
+          <input type="hidden" name="_method" value="PUT">
+        {{/if}}
+
+        <div class="mb-3">
+          <label for="title" class="form-label">Title</label>
+          <input type="text" class="form-control" id="title" name="title"
+                 value="{{note.title}}" placeholder="Untitled">
+        </div>
+
+        <div class="mb-3">
+          <label for="editor" class="form-label">Content</label>
+          <div id="editor" style="height: 300px;"></div>
+          <input type="hidden" name="content" id="content">
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Save Note</button>
+          <a href="/notes" class="btn btn-outline-secondary">Cancel</a>
+          {{#if note._id}}
+            <button type="button" class="btn btn-outline-danger ms-auto"
+                    onclick="deleteNote('{{note._id}}')">Delete</button>
+          {{/if}}
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="/js/quill.min.js"></script>
+<script>
+  // Initialize Quill editor
+  const quill = new Quill('#editor', {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        ['bold', 'italic', 'underline'],
+        ['blockquote', 'code-block'],
+        [{ 'header': 1 }, { 'header': 2 }],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        ['link', 'clean']
+      ]
+    }
+  });
+
+  // Load existing content
+  {{#if note.content.data}}
+    quill.setContents({{{json note.content.data}}});
+  {{/if}}
+
+  // Handle form submission
+  document.getElementById('noteForm').addEventListener('submit', function(e) {
+    const content = JSON.stringify(quill.getContents());
+    document.getElementById('content').value = JSON.stringify({
+      type: 'delta',
+      data: JSON.parse(content)
+    });
+  });
+
+  // Auto-save functionality
+  let saveTimeout;
+  quill.on('text-change', function() {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(autoSave, 2000);
+  });
+
+  async function autoSave() {
+    if (!document.querySelector('input[name="_method"]')) return; // Only auto-save existing notes
+
+    const formData = {
+      title: document.getElementById('title').value,
+      content: {
+        type: 'delta',
+        data: quill.getContents()
+      }
+    };
+
+    try {
+      const response = await fetch(window.location.pathname, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        showToast('Auto-saved', 'success');
+      }
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+    }
+  }
+</script>
+```
 
 ## Security Implementation
 
-### Input Validation
-- **XSS Prevention**: Sanitize HTML output from Delta rendering
-- **JSON Validation**: Validate Delta structure before database save
-- **Size Limits**: Maximum content size validation (configurable)
+### Content Sanitization
+```javascript
+// utils/contentSanitizer.ts
+import createDOMPurify from 'isomorphic-dompurify';
 
-### Authorization Checks
-```python
-def check_note_ownership(f):
-    @wraps(f)
-    def decorated_function(id, *args, **kwargs):
-        note = Note.query.get_or_404(id)
-        if note.user_id != current_user.id:
-            abort(404)  # Hide existence of other users' notes
-        return f(id, *args, **kwargs)
-    return decorated_function
+export class ContentSanitizer {
+
+  static sanitizeHTML(html: string): string {
+    const DOMPurify = createDOMPurify();
+
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'a', 'ol', 'ul', 'li', 'blockquote', 'code'],
+      ALLOWED_ATTR: ['href', 'target'],
+      FORBID_SCRIPTS: true,
+      FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input'],
+    });
+  }
+
+  // Convert Delta to safe HTML for display
+  static deltaToHTML(delta: any): string {
+    // Basic Delta to HTML conversion
+    // In production, use a proper Delta to HTML converter
+    if (!delta.ops) return '';
+
+    let html = '';
+    delta.ops.forEach((op: any) => {
+      if (typeof op.insert === 'string') {
+        let text = op.insert;
+
+        // Apply formatting attributes
+        if (op.attributes) {
+          if (op.attributes.bold) text = `<strong>${text}</strong>`;
+          if (op.attributes.italic) text = `<em>${text}</em>`;
+          if (op.attributes.underline) text = `<u>${text}</u>`;
+          if (op.attributes.link) text = `<a href="${op.attributes.link}" target="_blank">${text}</a>`;
+        }
+
+        // Handle line breaks
+        text = text.replace(/\n/g, '<br>');
+        html += text;
+      }
+    });
+
+    return this.sanitizeHTML(html);
+  }
+}
 ```
 
 ## Performance Optimization
 
-### Database Indexing
-```sql
--- Indexes for performance
-CREATE INDEX ix_notes_user_id ON notes (user_id);
-CREATE INDEX ix_notes_updated_at ON notes (updated_at);
-CREATE INDEX ix_notes_user_updated ON notes (user_id, updated_at DESC);
+### MongoDB Indexing Strategy
+```javascript
+// config/database.ts - Index creation
+export async function createIndexes() {
+  await Note.createIndexes([
+    // Compound index for user's notes sorted by update time
+    { userId: 1, updatedAt: -1 },
+
+    // Text search index
+    {
+      title: 'text',
+      'content.preview': 'text'
+    },
+
+    // Public notes index
+    { isPublic: 1, updatedAt: -1 },
+
+    // Sparse index for tags
+    { tags: 1 },
+  ]);
+}
 ```
 
-### Query Optimization
-- **Pagination**: Limit results per page (20-50 notes)
-- **Eager Loading**: Avoid N+1 queries for user relationships
-- **Select Fields**: Only load necessary columns for list views
+### Pagination and Query Optimization
+```javascript
+// Efficient pagination with cursor-based approach for large datasets
+export class NotePagination {
 
-### Content Performance
-- **Lazy Loading**: Load full content only when viewing individual notes
-- **Compression**: Compress large content_delta JSON in database
-- **Caching**: Cache rendered HTML for frequently accessed notes
+  static async paginateNotes(userId: string, options: {
+    limit?: number;
+    lastId?: string;
+    sortBy?: string;
+  }) {
+    const { limit = 20, lastId, sortBy = '-updatedAt' } = options;
 
-## Error Handling
+    const query: any = { userId: new Types.ObjectId(userId) };
 
-### Database Errors
-```python
-try:
-    db.session.commit()
-except IntegrityError:
-    db.session.rollback()
-    flash('Error saving note. Please try again.', 'error')
-except Exception as e:
-    db.session.rollback()
-    current_app.logger.error(f'Note save error: {e}')
-    flash('An unexpected error occurred.', 'error')
-```
+    // Cursor-based pagination for better performance
+    if (lastId) {
+      const lastNote = await Note.findById(lastId);
+      if (lastNote) {
+        query.updatedAt = { $lt: lastNote.updatedAt };
+      }
+    }
 
-### JSON Processing Errors
-```python
-def safe_json_load(content):
-    try:
-        return json.loads(content)
-    except (ValueError, TypeError):
-        # Fallback to plain text delta
-        return {"ops": [{"insert": str(content) + "\n"}]}
+    const notes = await Note
+      .find(query)
+      .sort(sortBy)
+      .limit(limit + 1) // Get one extra to check if there are more
+      .select('title content.preview createdAt updatedAt')
+      .lean();
+
+    const hasMore = notes.length > limit;
+    if (hasMore) notes.pop(); // Remove the extra note
+
+    return {
+      notes,
+      hasMore,
+      nextCursor: hasMore ? notes[notes.length - 1]._id : null
+    };
+  }
+}
 ```
 
 ## Testing Strategy
 
 ### Unit Tests
-- Note model methods and validation
-- Content Delta processing functions
-- Authorization helper functions
+```javascript
+// tests/services/noteService.test.ts
+import { NoteService } from '../../src/services/noteService';
+import { Note } from '../../src/models/Note';
+import { ContentProcessor } from '../../src/utils/contentProcessor';
 
-### Integration Tests
-- CRUD operation flows
-- Form submission and validation
-- Template rendering with various content types
+describe('NoteService', () => {
+  beforeEach(async () => {
+    await Note.deleteMany({});
+  });
 
-### Security Tests
-- Cross-user note access attempts
-- XSS in note content
-- SQL injection in note queries
-- CSRF protection on forms
+  describe('createNote', () => {
+    it('should create a note with Delta content', async () => {
+      const userId = new Types.ObjectId().toString();
+      const noteData = {
+        title: 'Test Note',
+        content: {
+          type: 'delta',
+          data: { ops: [{ insert: 'Hello World\n' }] }
+        }
+      };
 
-## Migration Considerations
+      const note = await NoteService.createNote(userId, noteData);
 
-### Database Migrations
-```python
-# Migration: Add Notes table
-def upgrade():
-    op.create_table('notes',
-        sa.Column('id', sa.Integer, primary_key=True),
-        sa.Column('title', sa.String(200)),
-        sa.Column('content_delta', sa.JSON),
-        sa.Column('created_at', sa.DateTime),
-        sa.Column('updated_at', sa.DateTime),
-        sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id')),
-    )
-    op.create_index('ix_notes_user_id', 'notes', ['user_id'])
+      expect(note.title).toBe('Test Note');
+      expect(note.content.type).toBe('delta');
+      expect(note.content.preview).toContain('Hello World');
+    });
+
+    it('should convert plain text to Delta', async () => {
+      const userId = new Types.ObjectId().toString();
+      const noteData = {
+        title: 'Plain Text Note',
+        content: {
+          type: 'plain',
+          data: 'This is plain text'
+        }
+      };
+
+      const note = await NoteService.createNote(userId, noteData);
+
+      expect(note.content.type).toBe('delta');
+      expect(note.content.data.ops).toBeDefined();
+    });
+  });
+
+  describe('getUserNotes', () => {
+    it('should return paginated notes for user', async () => {
+      const userId = new Types.ObjectId().toString();
+
+      // Create test notes
+      for (let i = 0; i < 25; i++) {
+        await NoteService.createNote(userId, {
+          title: `Note ${i}`,
+          content: { type: 'plain', data: `Content ${i}` }
+        });
+      }
+
+      const result = await NoteService.getUserNotes(userId, {
+        limit: 10,
+        page: 1
+      });
+
+      expect(result.notes).toHaveLength(10);
+      expect(result.pagination.total).toBe(25);
+      expect(result.pagination.pages).toBe(3);
+    });
+  });
+});
 ```
 
-### Data Migration
-- Convert existing plain text notes to Delta format
-- Preserve timestamps and ownership relationships
-- Validate content integrity post-migration
+### Integration Tests
+```javascript
+// tests/routes/notes.test.ts
+import request from 'supertest';
+import { app } from '../../src/app';
+import { User } from '../../src/models/User';
+import { Note } from '../../src/models/Note';
 
-## Future Enhancements
+describe('Notes API', () => {
+  let authToken: string;
+  let userId: string;
 
-### Search Functionality
-- Full-text search in note content
-- Search index on title and rendered content
-- Advanced filtering (date, tags, etc.)
+  beforeEach(async () => {
+    // Create test user and get auth token
+    const user = await User.create({
+      email: 'test@example.com',
+      passwordHash: 'hashedpassword'
+    });
+    userId = user._id.toString();
+    authToken = 'valid-jwt-token'; // Mock token
+  });
 
-### Note Categories/Tags
-- Many-to-many relationship: Note ↔ Tag
-- Tag management interface
-- Filtering and organization by tags
+  describe('POST /notes', () => {
+    it('should create a new note', async () => {
+      const noteData = {
+        title: 'Test Note',
+        content: {
+          type: 'delta',
+          data: { ops: [{ insert: 'Hello World\n' }] }
+        }
+      };
 
-### Export/Import
-- Export notes as JSON, Markdown, PDF
-- Import from other note-taking applications
-- Backup and restore functionality
+      const response = await request(app)
+        .post('/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(noteData);
+
+      expect(response.status).toBe(201);
+      expect(response.body.title).toBe('Test Note');
+
+      const note = await Note.findById(response.body._id);
+      expect(note).toBeTruthy();
+      expect(note?.userId.toString()).toBe(userId);
+    });
+
+    it('should validate note content', async () => {
+      const invalidNoteData = {
+        title: 'a'.repeat(201), // Too long
+        content: {
+          type: 'delta',
+          data: 'invalid-delta-format'
+        }
+      };
+
+      const response = await request(app)
+        .post('/notes')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(invalidNoteData);
+
+      expect(response.status).toBe(400);
+      expect(response.body.errors).toBeDefined();
+    });
+  });
+});
+```
+
+## Docker Development Commands
+
+```bash
+# Start development environment with notes functionality
+docker-compose up -d
+
+# Watch logs for both app and database
+docker-compose logs -f
+
+# Access MongoDB shell for data inspection
+docker-compose exec mongo mongosh projectspeckit
+
+# Rebuild after significant changes
+docker-compose down && docker-compose up --build
+
+# Run tests in container
+docker-compose exec app npm test
+
+# Check MongoDB collections
+docker-compose exec mongo mongosh --eval "db.notes.find().pretty()"
+```
