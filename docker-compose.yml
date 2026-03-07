@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongo:27017/projectspeckit
+      - JWT_SECRET=your-super-secret-development-key
+      - JWT_EXPIRES_IN=24h
+      - BCRYPT_ROUNDS=12
+    depends_on:
+      - mongo
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+    environment:
+      - MONGO_INITDB_DATABASE=projectspeckit
+
+volumes:
+  mongo_data:
+
+networks:
+  app-network:
+    driver: bridge
