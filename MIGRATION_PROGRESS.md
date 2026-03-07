@@ -34,9 +34,15 @@ Converting Flask note-taking application from standard structure to GitHub spec-
    - [x] Copied supporting files (requirements.txt, run.py, Dockerfile, docker-compose.yml, .gitignore)
    - [x] Verified file structure integrity
 
+4. **Repository Setup** (2026-03-07)
+   - [x] Initialize git repository
+   - [x] Create GitHub repository `project-speckit`
+   - [x] Initial commit and push
+   - [x] Repository URL: https://github.com/saulpark/project-speckit
+
 ### 🚧 IN PROGRESS
 
-4. **Feature Specifications**
+5. **Feature Specifications**
    - [x] `001-authentication/` - Created spec.md ✅
    - [ ] `002-notes-crud/` - Convert notes CRUD to spec-kit format
    - [ ] `003-note-sharing/` - Convert sharing feature to spec-kit format
@@ -44,15 +50,10 @@ Converting Flask note-taking application from standard structure to GitHub spec-
 
 ### ⏳ TODO
 
-5. **Documentation Migration**
+6. **Documentation Migration**
    - [ ] Convert TECH-SPEC.MD to plan.md files per feature
    - [ ] Convert AUDIT.md findings to tasks.md format
    - [ ] Create API contracts for public endpoints
-
-6. **Repository Setup**
-   - [ ] Initialize git repository
-   - [ ] Create GitHub repository `project-speckit`
-   - [ ] Initial commit and push
 
 7. **Final Verification**
    - [ ] Test application startup in new structure
