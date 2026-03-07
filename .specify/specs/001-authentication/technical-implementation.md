@@ -3,203 +3,512 @@
 ## Technology Stack
 
 ### Core Libraries
-- **Flask-Login**: Session management and user authentication state
-- **Flask-WTF**: Form handling, validation, and CSRF protection
-- **Werkzeug**: Password hashing utilities (`generate_password_hash`, `check_password_hash`)
-- **WTForms**: Form field validation and rendering
+- **Passport.js**: Authentication middleware with JWT strategy
+- **jsonwebtoken**: JWT token generation and verification
+- **bcrypt**: Password hashing with configurable salt rounds
+- **express-validator**: Input validation and sanitization middleware
+- **express-rate-limit**: Rate limiting for authentication endpoints
 
-### Database Implementation
-- **ORM**: SQLAlchemy with Flask-SQLAlchemy extension
-- **User Model Requirements**:
-  - `id`: Primary key (Integer, auto-increment)
-  - `email`: Unique email address (String, indexed)
-  - `password_hash`: Hashed password (String, never store plain text)
-  - `created_at`: Timestamp (DateTime, default=utcnow)
-  - `is_active`: Account status (Boolean, default=True)
+### Database Implementation (MongoDB)
+- **ODM**: Mongoose for MongoDB object modeling
+- **User Schema**:
+  ```javascript
+  {
+    _id: ObjectId,
+    email: String (unique, indexed),
+    passwordHash: String,
+    isActive: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+  }
+  ```
 
-### Security Implementation
+### Docker Configuration
 
-#### Password Security
-- **Hashing Algorithm**: Werkzeug's default PBKDF2-SHA256
-- **Salt**: Automatic random salt generation per password
-- **Hash Storage**: Store only `password_hash`, never plain text passwords
-- **Verification**: Use `check_password_hash(hash, password)` for authentication
+#### Development Environment
+```yaml
+# docker-compose.yml
+version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - MONGODB_URI=mongodb://mongo:27017/projectspeckit
+    depends_on:
+      - mongo
+    volumes:
+      - .:/app
+      - /app/node_modules
 
-#### Session Security
-- **Session Management**: Flask-Login's `login_user()` and `logout_user()`
-- **Session Store**: Flask's secure session cookies
-- **Session Configuration**:
-  - `SESSION_COOKIE_SECURE`: True in production (HTTPS only)
-  - `SESSION_COOKIE_HTTPONLY`: True (prevent XSS access)
-  - `PERMANENT_SESSION_LIFETIME`: Configurable timeout
-
-#### CSRF Protection
-- **Implementation**: Flask-WTF's `CSRFProtect` extension
-- **Token Generation**: Automatic per-session token generation
-- **Form Integration**: `{{ form.hidden_tag() }}` in all forms
-- **AJAX Support**: Include CSRF token in headers for AJAX requests
-
-### Route Implementation
-
-#### Blueprint Structure
-```python
-# app/auth/__init__.py
-auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
-
-# Routes:
-# /auth/register - GET (form), POST (process)
-# /auth/login - GET (form), POST (process)
-# /auth/logout - POST (logout action)
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
 ```
 
-#### Route Protection
-- **Public Routes**: Registration and login forms
-- **Protected Routes**: All other application routes use `@login_required`
-- **Redirect Handling**: `next` parameter for post-login redirection
-
-### Form Implementation
-
-#### Registration Form (WTForms)
-```python
-class RegistrationForm(FlaskForm):
-    email = EmailField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired(), Length(min=8)])
-    password2 = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
-    submit = SubmitField('Register')
-
-    def validate_email(self, email):
-        # Check email uniqueness against database
+#### Application Dockerfile
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["npm", "start"]
 ```
 
-#### Login Form (WTForms)
-```python
-class LoginForm(FlaskForm):
-    email = EmailField('Email', validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    remember_me = BooleanField('Remember Me')
-    submit = SubmitField('Sign In')
+## Security Implementation
+
+### Password Security
+- **Hashing Algorithm**: bcrypt with 12 salt rounds
+- **Async Hashing**: Non-blocking password operations
+- **Password Validation**: Minimum 8 characters, complexity rules
+- **Verification**: Secure timing-safe comparison
+
+```javascript
+// Password hashing utility
+import bcrypt from 'bcrypt';
+
+export class PasswordUtils {
+  private static readonly SALT_ROUNDS = 12;
+
+  static async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, this.SALT_ROUNDS);
+  }
+
+  static async verifyPassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+}
 ```
 
-### Database Queries
+### JWT Token Management
+- **Algorithm**: RS256 for enhanced security
+- **Token Structure**: { sub: userId, iat: issuedAt, exp: expiresAt }
+- **Expiration**: 24 hours for access tokens
+- **Secret Management**: Environment variables
 
-#### User Creation
-```python
-# Registration process
-user = User(email=form.email.data)
-user.set_password(form.password.data)  # Hashes password
-db.session.add(user)
-db.session.commit()
+```javascript
+// JWT utilities
+import jwt from 'jsonwebtoken';
+
+export class JWTUtils {
+  private static readonly SECRET = process.env.JWT_SECRET!;
+  private static readonly EXPIRES_IN = '24h';
+
+  static generateToken(userId: string): string {
+    return jwt.sign(
+      { sub: userId },
+      this.SECRET,
+      { expiresIn: this.EXPIRES_IN }
+    );
+  }
+
+  static verifyToken(token: string): { sub: string } | null {
+    try {
+      return jwt.verify(token, this.SECRET) as { sub: string };
+    } catch {
+      return null;
+    }
+  }
+}
 ```
 
-#### Authentication Query
-```python
-# Login verification
-user = User.query.filter_by(email=form.email.data).first()
-if user and user.check_password(form.password.data):
-    login_user(user, remember=form.remember_me.data)
+### Rate Limiting & Security
+```javascript
+import rateLimit from 'express-rate-limit';
+
+// Authentication rate limiting
+export const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per window
+  message: 'Too many authentication attempts',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 ```
 
-### Template Integration
+## Database Models
 
-#### Base Template Requirements
-- Navigation state based on `current_user.is_authenticated`
-- Flash message display for form errors/success
-- CSRF token meta tag for AJAX requests
+### User Model (Mongoose)
+```javascript
+import mongoose from 'mongoose';
+import { PasswordUtils } from '../utils/crypto';
 
-#### Form Templates
-- **Bootstrap Integration**: Form styling with Bootstrap classes
-- **Error Display**: Field-level and form-level error rendering
-- **CSRF Protection**: `{{ form.hidden_tag() }}` in all forms
+const userSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    index: true
+  },
+  passwordHash: {
+    type: String,
+    required: true
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  }
+}, {
+  timestamps: true // Adds createdAt and updatedAt
+});
 
-### Error Handling
+// Instance methods
+userSchema.methods.verifyPassword = async function(password: string): Promise<boolean> {
+  return PasswordUtils.verifyPassword(password, this.passwordHash);
+};
 
-#### Validation Errors
-- **Field Validation**: WTForms validators with custom messages
-- **Database Errors**: Handle unique constraint violations
-- **Flash Messages**: User-friendly error communication
+// Static methods
+userSchema.statics.findByEmail = function(email: string) {
+  return this.findOne({ email: email.toLowerCase() });
+};
 
-#### Security Error Handling
-- **Failed Login**: Generic "invalid credentials" message
-- **CSRF Failures**: Proper error pages, no sensitive data exposure
-- **Session Errors**: Graceful degradation and re-authentication prompts
-
-### Flask-Login Integration
-
-#### User Loader Function
-```python
-@login_manager.user_loader
-def load_user(user_id):
-    return User.query.get(int(user_id))
+export const User = mongoose.model('User', userSchema);
 ```
 
-#### Login Manager Configuration
-```python
-login_manager.login_view = 'auth.login'
-login_manager.login_message = 'Please log in to access this page.'
-login_manager.login_message_category = 'info'
+## Route Implementation
+
+### Express Router Structure
+```javascript
+// routes/auth.ts
+import express from 'express';
+import { authController } from '../controllers/authController';
+import { authLimiter } from '../middleware/rateLimiter';
+import { validateRegistration, validateLogin } from '../middleware/validation';
+
+const router = express.Router();
+
+// Authentication routes
+router.post('/register', authLimiter, validateRegistration, authController.register);
+router.post('/login', authLimiter, validateLogin, authController.login);
+router.post('/logout', authController.logout);
+
+// Form routes
+router.get('/register', authController.getRegisterForm);
+router.get('/login', authController.getLoginForm);
+
+export { router as authRouter };
 ```
 
-### Testing Requirements
+### Authentication Middleware
+```javascript
+// middleware/auth.ts
+import { Request, Response, NextFunction } from 'express';
+import { JWTUtils } from '../utils/jwt';
+import { User } from '../models/User';
 
-#### Unit Tests
-- Password hashing and verification
-- Form validation logic
-- User model methods
+interface AuthenticatedRequest extends Request {
+  user?: any;
+}
 
-#### Integration Tests
-- Registration flow end-to-end
-- Login/logout flow
-- Protected route access
-- CSRF protection validation
+export const authenticateToken = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-#### Security Tests
-- SQL injection attempt handling
-- XSS prevention in forms
-- Session security validation
-- Password hash verification
+  if (!token) {
+    return res.status(401).json({ error: 'Access token required' });
+  }
 
-### Configuration
+  const payload = JWTUtils.verifyToken(token);
+  if (!payload) {
+    return res.status(403).json({ error: 'Invalid or expired token' });
+  }
 
-#### Development Settings
-```python
-SECRET_KEY = 'dev-secret-key-change-in-production'
-WTF_CSRF_ENABLED = True
-WTF_CSRF_TIME_LIMIT = 3600  # 1 hour
+  const user = await User.findById(payload.sub);
+  if (!user || !user.isActive) {
+    return res.status(403).json({ error: 'User not found or inactive' });
+  }
+
+  req.user = user;
+  next();
+};
 ```
 
-#### Production Settings
-```python
-SECRET_KEY = os.environ.get('SECRET_KEY')
-SESSION_COOKIE_SECURE = True
-SESSION_COOKIE_HTTPONLY = True
-WTF_CSRF_SSL_STRICT = True
+## Input Validation
+
+### Validation Middleware
+```javascript
+// middleware/validation.ts
+import { body, validationResult } from 'express-validator';
+import { Request, Response, NextFunction } from 'express';
+
+export const validateRegistration = [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email required'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain uppercase, lowercase, and number'),
+  handleValidationErrors
+];
+
+export const validateLogin = [
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty(),
+  handleValidationErrors
+];
+
+function handleValidationErrors(req: Request, res: Response, next: NextFunction) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  next();
+}
 ```
 
-### Performance Considerations
+## Service Layer
 
-#### Database Optimization
-- Index on `User.email` for login queries
-- Connection pooling for concurrent requests
-- Prepared statements via SQLAlchemy
+### Authentication Service
+```javascript
+// services/authService.ts
+import { User } from '../models/User';
+import { PasswordUtils } from '../utils/crypto';
+import { JWTUtils } from '../utils/jwt';
 
-#### Session Performance
-- Minimal session data storage
-- Appropriate session timeout configuration
-- Consider Redis for session storage in high-traffic scenarios
+export class AuthService {
+  static async registerUser(email: string, password: string) {
+    // Check if user already exists
+    const existingUser = await User.findByEmail(email);
+    if (existingUser) {
+      throw new Error('User already exists');
+    }
 
-### Future Technical Enhancements
+    // Hash password and create user
+    const passwordHash = await PasswordUtils.hashPassword(password);
+    const user = new User({ email, passwordHash });
+    await user.save();
 
-#### Email Verification
-- SMTP configuration for email sending
-- Email verification token generation and validation
-- Account activation workflow
+    return { id: user._id, email: user.email };
+  }
 
-#### Multi-Factor Authentication
-- TOTP library integration (pyotp)
-- QR code generation for authenticator apps
-- Backup code system
+  static async authenticateUser(email: string, password: string) {
+    const user = await User.findByEmail(email);
+    if (!user || !user.isActive) {
+      throw new Error('Invalid credentials');
+    }
 
-#### OAuth Integration
-- OAuth2 client libraries (Authlib, Flask-Dance)
-- Provider-specific configuration (Google, GitHub, etc.)
-- Account linking strategies
+    const isValid = await user.verifyPassword(password);
+    if (!isValid) {
+      throw new Error('Invalid credentials');
+    }
+
+    const token = JWTUtils.generateToken(user._id.toString());
+    return { token, user: { id: user._id, email: user.email } };
+  }
+}
+```
+
+## Template Integration (Handlebars)
+
+### Layout Template
+```handlebars
+<!-- views/layouts/main.hbs -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project Spec-Kit</title>
+    <link href="/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg">
+        {{#if user}}
+            <span>Welcome, {{user.email}}</span>
+            <a href="/auth/logout" class="btn btn-outline-secondary">Logout</a>
+        {{else}}
+            <a href="/auth/login" class="btn btn-primary">Login</a>
+            <a href="/auth/register" class="btn btn-outline-primary">Register</a>
+        {{/if}}
+    </nav>
+
+    <div class="container">
+        {{#if messages.error}}
+            <div class="alert alert-danger">{{messages.error}}</div>
+        {{/if}}
+        {{#if messages.success}}
+            <div class="alert alert-success">{{messages.success}}</div>
+        {{/if}}
+
+        {{{body}}}
+    </div>
+</body>
+</html>
+```
+
+### Registration Form
+```handlebars
+<!-- views/auth/register.hbs -->
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <h2>Register</h2>
+        <form method="POST" action="/auth/register">
+            <div class="mb-3">
+                <label for="email" class="form-label">Email</label>
+                <input type="email" class="form-control" id="email" name="email" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Register</button>
+        </form>
+    </div>
+</div>
+```
+
+## Testing Configuration
+
+### Jest Setup
+```javascript
+// jest.config.js
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  testMatch: ['**/__tests__/**/*.ts', '**/?(*.)+(spec|test).ts'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/server.ts'
+  ]
+};
+```
+
+### Test Database Setup
+```javascript
+// tests/setup.ts
+import { MongoMemoryServer } from 'mongodb-memory-server';
+import mongoose from 'mongoose';
+
+let mongoServer: MongoMemoryServer;
+
+beforeAll(async () => {
+  mongoServer = await MongoMemoryServer.create();
+  const mongoUri = mongoServer.getUri();
+  await mongoose.connect(mongoUri);
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+  await mongoServer.stop();
+});
+
+beforeEach(async () => {
+  // Clear all collections before each test
+  const collections = mongoose.connection.collections;
+  for (const key in collections) {
+    await collections[key].deleteMany({});
+  }
+});
+```
+
+### Integration Tests
+```javascript
+// tests/auth.test.ts
+import request from 'supertest';
+import { app } from '../src/app';
+import { User } from '../src/models/User';
+
+describe('Authentication', () => {
+  describe('POST /auth/register', () => {
+    it('should create a new user', async () => {
+      const response = await request(app)
+        .post('/auth/register')
+        .send({
+          email: 'test@example.com',
+          password: 'Test123!'
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.user.email).toBe('test@example.com');
+
+      const user = await User.findByEmail('test@example.com');
+      expect(user).toBeTruthy();
+    });
+  });
+
+  describe('POST /auth/login', () => {
+    it('should authenticate valid user', async () => {
+      // Create user first
+      await User.create({
+        email: 'test@example.com',
+        passwordHash: await PasswordUtils.hashPassword('Test123!')
+      });
+
+      const response = await request(app)
+        .post('/auth/login')
+        .send({
+          email: 'test@example.com',
+          password: 'Test123!'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.token).toBeTruthy();
+    });
+  });
+});
+```
+
+## Development Workflow
+
+### Docker Commands
+```bash
+# Start development environment
+docker-compose up -d
+
+# View logs
+docker-compose logs -f app
+
+# Access MongoDB shell
+docker-compose exec mongo mongosh
+
+# Rebuild after changes
+docker-compose up --build
+
+# Stop environment
+docker-compose down
+```
+
+### Environment Variables
+```bash
+# .env (development)
+NODE_ENV=development
+PORT=3000
+MONGODB_URI=mongodb://mongo:27017/projectspeckit
+JWT_SECRET=your-super-secret-development-key
+JWT_EXPIRES_IN=24h
+BCRYPT_ROUNDS=12
+```
+
+## Security Considerations
+
+### Production Deployment
+- **HTTPS Only**: All authentication over secure connections
+- **Secure Headers**: helmet.js for security headers
+- **Rate Limiting**: Strict limits on authentication endpoints
+- **Environment Secrets**: Never commit secrets to repository
+- **Token Expiration**: Short-lived tokens with refresh mechanism
+
+### Security Audit Checklist
+- [ ] Passwords properly hashed with bcrypt
+- [ ] JWT tokens signed and verified correctly
+- [ ] Rate limiting implemented on auth endpoints
+- [ ] Input validation on all authentication fields
+- [ ] No password data in logs or error messages
+- [ ] Secure session configuration
+- [ ] Protection against timing attacks
