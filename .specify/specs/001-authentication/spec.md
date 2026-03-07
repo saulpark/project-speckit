@@ -42,10 +42,10 @@ Secure user authentication system for the Flask note-taking application, providi
 ### FR-005: Security Enforcement
 - **Description**: All authentication operations must be secure
 - **Acceptance Criteria**:
-  - Passwords hashed using Werkzeug
-  - CSRF protection on all forms
+  - Passwords securely hashed and never stored in plain text
+  - Protection against cross-site request forgery attacks
   - No password exposure in logs or responses
-  - Session data encrypted
+  - Session data properly secured
 - **Priority**: High
 
 ## Success Criteria
@@ -115,25 +115,22 @@ Secure user authentication system for the Flask note-taking application, providi
 
 ## Dependencies
 
-### External Libraries
-- Flask-Login for session management
-- Flask-WTF for form handling and CSRF
-- Werkzeug for password hashing
-- WTForms for form validation
+### Feature Dependencies
+- Database system for user account storage
+- Web framework with session management capabilities
+- Form handling and validation system
+- Secure password storage mechanism
 
-### Internal Dependencies
-- User model with email/password_hash fields
-- Database connection (SQLite via SQLAlchemy)
-- Base template with navigation
-- Flash message system for user feedback
-
-### Infrastructure
-- SQLite database for user storage
-- Flask application factory pattern
-- Blueprint registration system
+### Integration Points
+- Main application navigation system
+- User feedback and messaging system
+- Protected route authorization system
 
 ## [NEEDS CLARIFICATION]
 - Password complexity requirements (current: basic length check)
 - Password reset functionality timeline
 - Remember me functionality requirements
 - Email verification requirements for new accounts
+
+## Technical Implementation
+Detailed technical specifications, library choices, database schema, and implementation patterns are documented in `technical-implementation.md`.

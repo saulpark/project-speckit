@@ -10,9 +10,9 @@ Core note-taking functionality allowing users to create, read, update, and delet
 - **Acceptance Criteria**:
   - Note creation form with title and content fields
   - Notes automatically associated with logged-in user
-  - Support for rich content via content_delta JSON storage
-  - Automatic timestamps (created_at, updated_at)
-  - CSRF protection on creation form
+  - Support for rich content formatting
+  - Automatic creation and modification tracking
+  - Protection against unauthorized form submission
 - **Priority**: High
 
 ### FR-002: View Note List
@@ -28,18 +28,18 @@ Core note-taking functionality allowing users to create, read, update, and delet
 - **Description**: Users can read the full content of their notes
 - **Acceptance Criteria**:
   - Full note display with title and formatted content
-  - Readable rendering of rich content from content_delta
+  - Proper rendering of rich content formatting
   - Edit and delete action buttons
-  - Breadcrumb navigation back to note list
+  - Navigation back to note list
 - **Priority**: High
 
 ### FR-004: Edit Existing Notes
 - **Description**: Users can modify their existing notes
 - **Acceptance Criteria**:
   - Pre-populated edit form with current note data
-  - Save changes updates content_delta and updated_at timestamp
+  - Save changes updates content and modification tracking
   - Cancel option returns to note view without changes
-  - CSRF protection on edit form
+  - Protection against unauthorized form submission
 - **Priority**: High
 
 ### FR-005: Delete Notes
@@ -55,8 +55,8 @@ Core note-taking functionality allowing users to create, read, update, and delet
 - **Description**: Users can only access their own notes
 - **Acceptance Criteria**:
   - All note operations enforce user ownership
-  - 404 error for accessing other users' notes
-  - Database queries filtered by user_id
+  - Appropriate error for accessing other users' notes
+  - Data access restricted to user's own content
   - No information leakage about other users' notes
 - **Priority**: High
 
@@ -114,36 +114,38 @@ Core note-taking functionality allowing users to create, read, update, and delet
 ### Business Rules
 - Notes belong to exactly one user (no sharing in this feature)
 - Note titles can be empty (default to "Untitled")
-- Content stored as JSON delta for rich text support
-- Soft delete not implemented (permanent deletion)
+- Content supports rich text formatting
+- Note deletion is permanent (no recovery option)
 
 ### Edge Cases
-- Very large note content (>1MB)
+- Very large note content (size limits)
 - Concurrent editing by same user (multiple tabs)
-- Database connection failures during save
-- Malformed content_delta JSON recovery
+- System failures during save operations
+- Corrupted or invalid content format recovery
 
 ## Dependencies
 
-### Internal Dependencies
+### Feature Dependencies
 - User authentication system (001-authentication)
-- User model with proper relationships
-- Note model with user_id foreign key
-- Database migrations for Note table
+- User account management capabilities
+- Data persistence and retrieval system
+- Web form handling and validation
 
-### External Libraries
-- SQLAlchemy for ORM operations
-- Flask-WTF for form handling
-- Jinja2 for template rendering
-- Bootstrap for responsive UI
+### Integration Points
+- User session and identity management
+- Content formatting and display system
+- Responsive user interface framework
 
-### Future Dependencies
-- Quill.js for rich text editing (planned)
-- Search functionality (future feature)
-- Note categories/tags (future feature)
+### Future Enhancements
+- Advanced rich text editing capabilities
+- Search and filtering functionality
+- Note organization and categorization
 
 ## [NEEDS CLARIFICATION]
 - Rich text editor implementation timeline (currently using textarea)
 - Note sharing functionality interaction with this feature
 - Search and filtering requirements
 - Maximum note size limits and validation
+
+## Technical Implementation
+Detailed technical specifications, database schema, API endpoints, and implementation patterns are documented in `technical-implementation.md`.
