@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import { AuthService, AuthError } from '../services/authService';
+import { TokenBlacklistService } from '../services/tokenBlacklistService';
+import { JWTUtils } from '../utils/jwt';
+import { AuthenticatedRequest } from '../middleware/auth';
 
 /**
  * Interface for registration request body
@@ -96,14 +99,16 @@ export class AuthController {
       // Set session or token expiry based on rememberMe option
       const tokenExpiry = rememberMe ? '30d' : '24h';
 
-      // Return success response with user data
+      // Return success response with user data and JWT token
       res.status(200).json({
         success: true,
         message: authResult.message,
         data: {
           user: authResult.user,
+          token: authResult.token.token,
+          expiresAt: authResult.token.expiresAt,
           session: {
-            expiresIn: tokenExpiry,
+            expiresIn: authResult.token.expiresIn,
             rememberMe: Boolean(rememberMe)
           }
         },
@@ -141,26 +146,74 @@ export class AuthController {
    */
   static async logout(req: Request, res: Response): Promise<void> {
     try {
-      // In a JWT-based system, logout is primarily client-side
-      // Server-side logout would involve token blacklisting if needed
+      // Extract token from Authorization header
+      const authHeader = req.headers['authorization'];
+      const token = JWTUtils.extractTokenFromHeader(authHeader);
 
-      console.log('🚪 User logout requested');
+      if (!token) {
+        // No token provided, treat as successful logout (client-side)
+        console.log('🚪 User logout requested (no token provided)');
 
+        res.status(200).json({
+          success: true,
+          message: 'Logout successful',
+          data: {
+            loggedOut: true,
+            method: 'client-side'
+          },
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      // Verify token to get user information
+      const verification = JWTUtils.verifyToken(token);
+
+      if (verification.valid && verification.payload) {
+        // Blacklist the token
+        await TokenBlacklistService.blacklistToken(token, verification.payload.sub);
+
+        console.log(`🚪 User logout: ${verification.payload.email} (ID: ${verification.payload.sub})`);
+
+        res.status(200).json({
+          success: true,
+          message: 'Logout successful',
+          data: {
+            loggedOut: true,
+            method: 'server-side',
+            tokenInvalidated: true
+          },
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        // Token is invalid, but that's okay for logout
+        console.log('🚪 User logout with invalid token (already expired)');
+
+        res.status(200).json({
+          success: true,
+          message: 'Logout successful',
+          data: {
+            loggedOut: true,
+            method: 'client-side',
+            tokenInvalidated: false,
+            reason: 'Token already invalid'
+          },
+          timestamp: new Date().toISOString()
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+
+      // Even if there's an error, we should allow logout to succeed
       res.status(200).json({
         success: true,
         message: 'Logout successful',
         data: {
-          loggedOut: true
+          loggedOut: true,
+          method: 'client-side',
+          warning: 'Server-side logout failed, but client-side logout is sufficient'
         },
-        timestamp: new Date().toISOString()
-      });
-
-    } catch (error) {
-      console.error('❌ Logout error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'An error occurred during logout',
-        error: 'LOGOUT_ERROR',
         timestamp: new Date().toISOString()
       });
     }
@@ -268,12 +321,14 @@ export class AuthController {
   static async getAuthStats(req: Request, res: Response): Promise<void> {
     try {
       const activeUserCount = await AuthService.getActiveUserCount();
+      const blacklistStats = TokenBlacklistService.getBlacklistStats();
 
       res.status(200).json({
         success: true,
         data: {
           stats: {
             totalActiveUsers: activeUserCount,
+            tokenBlacklist: blacklistStats,
             lastUpdated: new Date().toISOString()
           }
         },

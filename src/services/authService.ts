@@ -1,5 +1,6 @@
 import { User, IUser } from '../models/User';
 import { PasswordUtils } from '../utils/crypto';
+import { JWTUtils, TokenResponse } from '../utils/jwt';
 
 /**
  * Custom error types for authentication operations
@@ -33,6 +34,7 @@ export interface UserResponse {
 
 export interface AuthenticationResult {
   user: UserResponse;
+  token: TokenResponse;
   message: string;
 }
 
@@ -183,7 +185,13 @@ export class AuthService {
         );
       }
 
-      // Return successful authentication result
+      // Generate JWT token
+      const token = JWTUtils.generateToken(
+        user._id.toString(),
+        user.email
+      );
+
+      // Return successful authentication result with token
       return {
         user: {
           id: user._id.toString(),
@@ -192,6 +200,7 @@ export class AuthService {
           createdAt: user.createdAt,
           updatedAt: user.updatedAt
         },
+        token,
         message: 'Authentication successful'
       };
 
