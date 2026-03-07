@@ -166,38 +166,167 @@ project-speckit/ (Node.js)
 └── .env.example               # Environment template
 ```
 
-## Migration Strategy
+## Migration Strategy - Small Steps Approach
 
-### Phase 2A: Foundation (Week 1)
-1. Set up Node.js/TypeScript project structure
-2. Configure development environment and tooling
-3. Set up Prisma with existing SQLite database
-4. Create basic Express server with middleware
+Each step will be implemented on its own git branch, tested, and merged individually.
 
-### Phase 2B: Core Features (Week 2-3)
-1. Migrate authentication system completely
-2. Migrate notes CRUD operations
-3. Ensure feature parity with Flask version
-4. Add comprehensive testing
+### Foundation Steps
+**Step 1** (`step-01-nodejs-init`): Initialize Node.js project
+- Create package.json with basic dependencies
+- Set up TypeScript configuration
+- Add basic npm scripts (dev, build, start)
+- **Test**: `npm install` and `npm run build` work
 
-### Phase 2C: Advanced Features (Week 4)
-1. Implement note sharing functionality
-2. Complete user management features
-3. Enhance frontend interface
-4. Performance optimization
+**Step 2** (`step-02-express-basic`): Basic Express server
+- Create minimal Express.js server
+- Add basic middleware (cors, json parsing)
+- Create health check endpoint
+- **Test**: Server starts and responds to health check
 
-### Phase 2D: Deployment (Week 5)
-1. Update deployment configuration
-2. Data migration verification
-3. Production readiness testing
-4. Documentation updates
+**Step 3** (`step-03-prisma-setup`): Database setup
+- Initialize Prisma with SQLite
+- Create basic User and Note schemas
+- Generate Prisma client
+- **Test**: `npx prisma generate` works, can connect to database
 
-## Rollback Strategy
+**Step 4** (`step-04-env-config`): Environment configuration
+- Set up environment variables management
+- Configure development/production environments
+- Add secrets management
+- **Test**: App loads config from .env file correctly
 
-- **Master branch**: Contains working Flask application
-- **migrate_to_nodejs branch**: Development branch for Node.js version
-- **Database backup**: SQLite file preserved before migration
-- **Documentation**: Both Python and Node.js technical specs maintained
+### Authentication Steps
+**Step 5** (`step-05-auth-models`): User authentication models
+- Implement User model with Prisma
+- Add password hashing utilities (bcrypt)
+- Create user service layer
+- **Test**: Can create user, hash password, verify password
+
+**Step 6** (`step-06-auth-routes`): Authentication routes
+- Implement registration endpoint
+- Implement login endpoint
+- Add basic input validation
+- **Test**: Can register user and login via API calls
+
+**Step 7** (`step-07-jwt-sessions`): Session management
+- Implement JWT token generation/validation
+- Add authentication middleware
+- Protect routes with auth middleware
+- **Test**: Protected routes require valid JWT
+
+### CRUD Operations Steps
+**Step 8** (`step-08-notes-model`): Notes data layer
+- Implement Note model with Prisma
+- Add note service layer with CRUD operations
+- Ensure user ownership validation
+- **Test**: Can create, read, update, delete notes via service
+
+**Step 9** (`step-09-notes-routes`): Notes API endpoints
+- Implement REST API for notes
+- Add input validation for note operations
+- Apply authentication middleware
+- **Test**: Full CRUD operations via API endpoints
+
+**Step 10** (`step-10-rich-text`): Rich text content
+- Implement JSON Delta content storage
+- Add content validation and processing
+- Handle plain text to Delta conversion
+- **Test**: Can save and retrieve rich text content
+
+### Frontend Steps
+**Step 11** (`step-11-static-setup`): Static file serving
+- Set up static file serving (CSS, JS, images)
+- Choose and configure template engine
+- Create basic layout template
+- **Test**: Static files served correctly, template renders
+
+**Step 12** (`step-12-auth-frontend`): Authentication UI
+- Convert login/register forms to new template engine
+- Add client-side form validation
+- Implement auth flow in frontend
+- **Test**: Complete auth workflow works in browser
+
+**Step 13** (`step-13-notes-frontend`): Notes management UI
+- Convert notes list/view/edit templates
+- Add rich text editor (Quill.js)
+- Implement note management workflow
+- **Test**: Full note management works in browser
+
+### Advanced Features Steps
+**Step 14** (`step-14-sharing-model`): Note sharing data layer
+- Add sharing models to Prisma schema
+- Implement sharing service layer
+- Add permission validation
+- **Test**: Can create, manage note sharing permissions
+
+**Step 15** (`step-15-sharing-routes`): Note sharing API
+- Implement sharing endpoints
+- Add public note access routes
+- Apply appropriate authentication
+- **Test**: Note sharing works via API
+
+**Step 16** (`step-16-user-management`): User administration
+- Implement user list/detail routes
+- Add user management UI
+- Add profile management
+- **Test**: User admin features work completely
+
+### Testing & Quality Steps
+**Step 17** (`step-17-unit-tests`): Unit testing setup
+- Configure Jest testing framework
+- Add unit tests for services and models
+- Set up test database
+- **Test**: All unit tests pass
+
+**Step 18** (`step-18-integration-tests`): Integration testing
+- Add API endpoint tests
+- Add authentication flow tests
+- Add database integration tests
+- **Test**: All integration tests pass
+
+**Step 19** (`step-19-e2e-tests`): End-to-end testing
+- Add complete user workflow tests
+- Test all features working together
+- Add performance benchmarks
+- **Test**: All E2E scenarios pass
+
+### Deployment Steps
+**Step 20** (`step-20-docker-update`): Containerization
+- Update Dockerfile for Node.js
+- Update docker-compose.yml
+- Add production environment config
+- **Test**: App runs correctly in Docker
+
+**Step 21** (`step-21-data-migration`): Data preservation
+- Ensure existing SQLite data is preserved
+- Verify all existing users and notes work
+- Add data migration scripts if needed
+- **Test**: All existing data accessible in new app
+
+**Step 22** (`step-22-final-verification`): Production readiness
+- Performance testing and optimization
+- Security audit and fixes
+- Documentation updates
+- **Test**: App ready for production deployment
+
+## Branch Strategy
+
+### Main Branches
+- **master**: Working Flask application (preserved)
+- **migrate_to_nodejs**: Base branch for Node.js migration
+
+### Step Branches
+Each step implemented on dedicated branch:
+- `step-01-nodejs-init` → merge to `migrate_to_nodejs`
+- `step-02-express-basic` → merge to `migrate_to_nodejs`
+- `step-03-prisma-setup` → merge to `migrate_to_nodejs`
+- ... (continue for each step)
+
+### Safety & Rollback
+- Each step can be independently rolled back
+- Working Flask app always available on master
+- Database backed up before any data migration steps
+- Failed steps don't affect previous working state
 
 ## Success Criteria
 
@@ -222,11 +351,20 @@ project-speckit/ (Node.js)
 
 ## Resume Commands
 
-To continue Node.js migration:
+To continue with next migration step:
 ```bash
 cd C:\Users\saulp\project-speckit
 git checkout migrate_to_nodejs
-# Start with Node.js project setup
-npm init -y
-# Follow migration plan Phase 2A
+
+# Start next step (example: Step 1)
+git checkout -b step-01-nodejs-init
+# Implement step according to plan
+# Test the step
+# Commit changes
+# git checkout migrate_to_nodejs
+# git merge step-01-nodejs-init
+# git branch -d step-01-nodejs-init
 ```
+
+## Current Status
+**Next Step**: Step 1 - Initialize Node.js project (`step-01-nodejs-init`)
