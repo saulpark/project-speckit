@@ -2,50 +2,46 @@
 
 ## Core Principles (Non-Negotiable)
 
-### Architecture
-1. **Blueprint Pattern**: Every feature domain gets its own Flask Blueprint with dedicated routes, forms, and templates
-2. **Application Factory**: Use `create_app()` pattern for Flask initialization and extension registration
-3. **Service Layer**: Business logic lives in service classes, not in route handlers
+### Architecture Philosophy
+1. **Modular Design**: Features are organized into distinct, self-contained modules
+2. **Separation of Concerns**: Clear separation between presentation, business logic, and data layers
+3. **Factory Pattern**: Application initialization follows established factory patterns
+4. **Service Layer Architecture**: Business logic is isolated from web framework concerns
 
-### Security (Mandatory)
-1. **Authentication Required**: All routes MUST use `@login_required` decorator (exceptions: auth routes, public sharing)
-2. **CSRF Protection**: Every POST form MUST include CSRF tokens via `{{ form.hidden_tag() }}` or manual token
-3. **Password Security**: Use Werkzeug password hashing, never plain text
-4. **Ownership Enforcement**: Users can only access their own resources via helper functions like `_get_own_note_or_404()`
+### Security Philosophy (Mandatory)
+1. **Authentication First**: All application areas require authentication unless explicitly designed for public access
+2. **Data Protection**: All user input must be validated and sanitized
+3. **Secure by Default**: Security measures are built-in, not optional add-ons
+4. **Resource Ownership**: Users can only access resources they own or have explicit permission to use
 
-### Development Workflow (Non-Negotiable)
-1. **Test-First**: Tests are mandatory before any git operation - enforced by pre-commit hooks
-2. **Documentation Sync**: TestUpdate and UpdateProjectDocs agents MUST run before commits
-3. **Dependency Management**: Use pinned versions in `requirements.txt`
-4. **Virtual Environment**: Never commit `venv/`, always recreate from requirements
+### Development Philosophy (Non-Negotiable)
+1. **Test-Driven Quality**: Code quality is enforced through automated testing
+2. **Documentation Driven**: Code changes must be accompanied by documentation updates
+3. **Reproducible Environments**: Development environment setup is automated and consistent
+4. **Version Controlled Dependencies**: All dependencies are explicitly versioned
 
-### Code Conventions
-1. **URL Generation**: Always use `url_for('blueprint.route_name')` in templates, never hardcode paths
-2. **Extension Pattern**: Global extensions (db, login_manager, csrf) defined in `app/extensions.py`
-3. **Template Organization**: Templates mirror blueprint structure (`auth/`, `notes/`, `users/`)
+### Code Quality Standards
+1. **Explicit Over Implicit**: Code behavior should be predictable and clearly expressed
+2. **Template Consistency**: User interface follows consistent patterns and organization
+3. **Maintainable Architecture**: Code structure supports long-term maintenance and extension
 
-### Data Integrity
-1. **Foreign Keys**: Enforce relationships at database level
-2. **Timestamps**: All models include created_at/updated_at
-3. **JSON Content**: Use `content_delta` for rich content storage
+### Data Integrity Principles
+1. **Referential Integrity**: Data relationships are enforced at the appropriate level
+2. **Audit Trails**: Important data changes are tracked with timestamps
+3. **Structured Storage**: Complex data is stored in appropriate, queryable formats
 
-### Quality Gates
-1. **Pre-commit Testing**: pytest gate blocks commits if tests fail
-2. **Documentation Updates**: Docs must stay in sync with code changes
-3. **Code Review**: Use `/CodeReview` command for on-demand audits
+### Quality Assurance
+1. **Automated Testing**: Quality is enforced through automated checks before deployment
+2. **Living Documentation**: Documentation evolves with the codebase
+3. **Continuous Review**: Code quality is monitored through regular review processes
 
-## Technology Stack (Fixed)
-- **Backend**: Flask 3.0.0+ with Blueprints
-- **Database**: SQLAlchemy + SQLite
-- **Auth**: Flask-Login (session-based)
-- **Forms**: Flask-WTF + CSRFProtect
-- **UI**: Bootstrap 5 + Bootstrap Icons + Jinja2
-- **Testing**: pytest with in-memory SQLite
+## Prohibited Practices
+- **Hardcoded Dependencies**: URLs, file paths, or configuration values embedded in code
+- **Mixed Responsibilities**: Web handling logic mixed with business logic
+- **Security Shortcuts**: Bypassing established security measures
+- **Undisciplined Commits**: Code changes without proper testing and documentation
+- **Broken Contracts**: Data models that don't enforce their declared relationships
+- **Unauthorized Access**: Authentication bypasses without explicit documentation and approval
 
-## Forbidden Patterns
-- Hardcoded URLs in templates
-- Route handlers with business logic
-- Missing CSRF protection on state-changing requests
-- Committing without running mandatory agents
-- Models without proper relationships
-- Authentication bypasses (except documented public routes)
+## Implementation Reference
+Technical implementation details, specific libraries, versions, and configuration requirements are documented separately in `technical-requirements.md`.
