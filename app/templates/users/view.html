@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.email }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <h2 class="mb-4"><i class="bi bi-person-circle"></i> User Profile</h2>
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-sm-4 fw-semibold">Email</div>
+                    <div class="col-sm-8">{{ user.email }}</div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-4 fw-semibold">User ID</div>
+                    <div class="col-sm-8">{{ user.id }}</div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-4 fw-semibold">Created</div>
+                    <div class="col-sm-8">{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-4 fw-semibold">Last Updated</div>
+                    <div class="col-sm-8">{{ user.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-sm-4 fw-semibold">Total Notes</div>
+                    <div class="col-sm-8"><span class="badge bg-info">{{ note_count }}</span></div>
+                </div>
+            </div>
+            <div class="card-footer d-flex gap-2">
+                <a href="{{ url_for('users.edit_password', id=user.id) }}" class="btn btn-primary btn-sm"><i class="bi bi-key"></i> Change Password</a>
+                <a href="{{ url_for('notes.list_notes') }}" class="btn btn-outline-secondary btn-sm ms-auto"><i class="bi bi-arrow-left"></i> Back to Notes</a>
+            </div>
+        </div>
+
+        {% if user.notes %}
+        <div class="card shadow-sm">
+            <div class="card-header"><i class="bi bi-journal-text"></i> Your Notes</div>
+            <ul class="list-group list-group-flush">
+                {% for note in user.notes %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('notes.view_note', id=note.id) }}" class="text-decoration-none">
+                        {{ note.title or 'Untitled' }}
+                    </a>
+                    <span class="text-muted small">{{ note.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

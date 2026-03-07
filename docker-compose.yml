@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./instance:/app/instance
+    environment:
+      - FLASK_APP=run.py
+      - PYTHONUNBUFFERED=1
+    command: python run.py
+
+  sqlite-web:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./instance:/app/instance
+    environment:
+      - SQLITE_WEB_PASSWORD=${SQLITE_WEB_PASSWORD:-Kx9#mR2vLp4!}
+    command: sqlite_web --host 0.0.0.0 --port 8080 --password instance/notes.db
+    depends_on:
+      - web

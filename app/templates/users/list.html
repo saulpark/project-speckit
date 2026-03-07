@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Users{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0"><i class="bi bi-people"></i> Users</h2>
+    <a href="{{ url_for('users.new_user') }}" class="btn btn-primary"><i class="bi bi-person-plus"></i> New User</a>
+</div>
+
+{% if users %}
+<div class="table-responsive">
+    <table class="table table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Email</th>
+                <th>Created</th>
+                <th>Notes</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>
+                    <a href="{{ url_for('users.view_user', id=user.id) }}" class="text-decoration-none fw-semibold">
+                        <i class="bi bi-person-circle"></i> {{ user.email }}
+                    </a>
+                </td>
+                <td class="text-muted">{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td><span class="badge bg-info">{{ user.notes|length }}</span></td>
+                <td>
+                    <a href="{{ url_for('users.view_user', id=user.id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+                    <a href="{{ url_for('users.edit_password', id=user.id) }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-key"></i></a>
+                    <form method="POST" action="{{ url_for('users.delete_user', id=user.id) }}" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this user and all their notes?')"><i class="bi bi-trash"></i></button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-people fs-1 text-muted"></i>
+    <p class="mt-3 text-muted">No users yet. <a href="{{ url_for('users.new_user') }}">Create the first user!</a></p>
+</div>
+{% endif %}
+{% endblock %}
