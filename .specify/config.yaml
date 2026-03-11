@@ -1,0 +1,28 @@
+# Spec-Kit Configuration
+project:
+  name: "project-speckit"
+  description: "Authentication system with comprehensive JWT session management"
+  version: "1.0.0"
+
+ai:
+  provider: "claude"
+  model: "sonnet"
+
+workflow:
+  constitution: ".specify/constitution.md"
+  specs_dir: ".specify/specs"
+  artifacts_dir: ".specify/artifacts"
+  # plans and tasks live inside each spec directory (e.g. .specify/specs/001-authentication/plan.md)
+
+quality_gates:
+  - typescript_compilation
+  - test_coverage
+  - security_scan
+  - constitution_compliance
+  - documentation_current
+
+automation:
+  pre_commit_hooks: true
+  auto_documentation: true
+  test_generation: true
+  spec_validation: true
