@@ -8,13 +8,19 @@ import {
   sanitizeInput,
   validateRateLimit
 } from '../middleware/validation';
+import { body } from 'express-validator';
 import { authenticateToken, optionalAuthentication } from '../middleware/auth';
+import { CSRFProtection, authRateLimit } from '../middleware/security';
+import { TokenBlacklistService } from '../services/tokenBlacklistService';
 
 const router = express.Router();
 
 // Apply common middleware to all auth routes
 router.use(sanitizeInput);
 router.use(validateRateLimit);
+
+// Apply auth-specific rate limiting to sensitive endpoints
+router.use(['/login', '/register', '/reset-password-request'], authRateLimit);
 
 /**
  * @route   POST /auth/register
@@ -23,6 +29,7 @@ router.use(validateRateLimit);
  * @body    { email: string, password: string, confirmPassword?: string, firstName?: string, lastName?: string }
  */
 router.post('/register',
+  CSRFProtection.verifyTokenMiddleware(),
   validateRegistration,
   handleValidationErrors,
   AuthController.register
@@ -35,6 +42,7 @@ router.post('/register',
  * @body    { email: string, password: string, rememberMe?: boolean }
  */
 router.post('/login',
+  CSRFProtection.verifyTokenMiddleware(),
   validateLogin,
   handleValidationErrors,
   AuthController.login
@@ -97,22 +105,85 @@ router.get('/me', authenticateToken, (req: express.Request, res: express.Respons
 });
 
 /**
+ * @route   GET /auth/login
+ * @desc    Display login form
+ * @access  Public
+ */
+router.get('/login', (req: express.Request, res: express.Response) => {
+  res.render('auth/login', {
+    pageTitle: 'Sign In',
+    bodyClass: 'auth-page',
+    description: 'Sign in to your SpecKit account',
+    showAuthLinks: false,
+    currentYear: new Date().getFullYear()
+  });
+});
+
+/**
+ * @route   GET /auth/register
+ * @desc    Display registration form
+ * @access  Public
+ */
+router.get('/register', (req: express.Request, res: express.Response) => {
+  res.render('auth/register', {
+    pageTitle: 'Create Account',
+    bodyClass: 'auth-page',
+    description: 'Create your SpecKit account',
+    showAuthLinks: false,
+    currentYear: new Date().getFullYear()
+  });
+});
+
+/**
+ * @route   GET /dashboard
+ * @desc    Display authenticated user dashboard
+ * @access  Protected - requires authentication
+ */
+router.get('/dashboard', authenticateToken, (req: express.Request, res: express.Response) => {
+  const authReq = req as any; // AuthenticatedRequest
+
+  res.render('dashboard', {
+    pageTitle: 'Dashboard',
+    bodyClass: 'dashboard-page',
+    description: 'SpecKit Dashboard - Authentication System',
+    showAuthLinks: true,
+    user: authReq.user,
+    environment: process.env.NODE_ENV || 'development',
+    version: process.env.npm_package_version || '1.0.0',
+    currentTime: new Date().toLocaleString(),
+    uptime: process.uptime(),
+    currentYear: new Date().getFullYear()
+  });
+});
+
+/**
  * @route   POST /auth/reset-password-request
- * @desc    Request password reset (future implementation)
+ * @desc    Request password reset token
  * @access  Public
  * @body    { email: string }
  */
 router.post('/reset-password-request',
   validatePasswordResetRequest,
   handleValidationErrors,
-  (req: express.Request, res: express.Response) => {
-    res.status(501).json({
-      success: false,
-      message: 'Password reset feature not yet implemented',
-      error: 'NOT_IMPLEMENTED',
-      timestamp: new Date().toISOString()
-    });
-  }
+  AuthController.requestPasswordReset
+);
+
+/**
+ * @route   POST /auth/reset-password
+ * @desc    Reset password with token
+ * @access  Public
+ * @body    { resetToken: string, newPassword: string }
+ */
+router.post('/reset-password',
+  // Add validation for reset password fields
+  body('resetToken').notEmpty().withMessage('Reset token is required'),
+  body('newPassword')
+    .isLength({ min: 8, max: 128 })
+    .withMessage('Password must be between 8 and 128 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Password must contain at least one lowercase letter, one uppercase letter, and one number'),
+  handleValidationErrors,
+  AuthController.resetPassword
 );
 
 // Health check endpoint specific to auth routes
@@ -128,9 +199,95 @@ router.get('/health', (req: express.Request, res: express.Response) => {
       logout: 'POST /auth/logout',
       checkEmail: 'POST /auth/check-email',
       profile: 'GET /auth/profile[/:userId]',
-      stats: 'GET /auth/stats'
+      stats: 'GET /auth/stats',
+      resetPasswordRequest: 'POST /auth/reset-password-request',
+      resetPassword: 'POST /auth/reset-password',
+      adminStatus: 'GET /auth/admin/status'
     }
   });
+});
+
+/**
+ * @route   GET /auth/admin/status
+ * @desc    Get detailed system status for administrators
+ * @access  Protected - requires authentication
+ */
+router.get('/admin/status', authenticateToken, (req: express.Request, res: express.Response) => {
+  try {
+    const memoryUsage = process.memoryUsage();
+    const uptime = process.uptime();
+    const blacklistStats = TokenBlacklistService.getBlacklistStats();
+
+    const adminStatus = {
+      service: 'authentication-system',
+      version: '1.0.0',
+      status: 'operational',
+      timestamp: new Date().toISOString(),
+      system: {
+        uptime: {
+          seconds: Math.round(uptime),
+          human: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${Math.floor(uptime % 60)}s`,
+          startedAt: new Date(Date.now() - uptime * 1000).toISOString()
+        },
+        memory: {
+          rss: `${Math.round(memoryUsage.rss / 1024 / 1024)}MB`,
+          heapTotal: `${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB`,
+          heapUsed: `${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB`,
+          heapUsedPercent: `${Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100)}%`,
+          external: `${Math.round(memoryUsage.external / 1024 / 1024)}MB`
+        },
+        environment: {
+          nodeEnv: process.env.NODE_ENV || 'development',
+          nodeVersion: process.version,
+          platform: process.platform,
+          architecture: process.arch
+        }
+      },
+      authentication: {
+        tokenBlacklist: blacklistStats,
+        endpoints: {
+          total: 12,
+          protected: 6,
+          public: 6
+        },
+        security: {
+          rateLimiting: 'active',
+          csrfProtection: process.env.NODE_ENV !== 'test' ? 'active' : 'disabled-for-tests',
+          jwtValidation: 'active',
+          passwordHashing: 'bcrypt-12-rounds'
+        }
+      },
+      features: {
+        userRegistration: 'active',
+        userLogin: 'active',
+        tokenBlacklisting: 'active',
+        passwordReset: 'active',
+        profileManagement: 'active',
+        emailValidation: 'active'
+      },
+      monitoring: {
+        healthChecks: 'active',
+        performanceTracking: 'active',
+        errorLogging: 'active',
+        securityLogging: 'active'
+      }
+    };
+
+    res.status(200).json({
+      success: true,
+      data: adminStatus,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('❌ Admin status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving admin status',
+      error: 'ADMIN_STATUS_ERROR',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Temporary test endpoint to generate JWT tokens for testing

@@ -32,8 +32,13 @@ export interface VerificationResult {
  * JWT utilities for token generation, verification, and management
  */
 export class JWTUtils {
-  private static readonly SECRET = process.env.JWT_SECRET || 'fallback-secret-change-in-production';
-  private static readonly DEFAULT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
+  private static get SECRET(): string {
+    return process.env.JWT_SECRET || 'fallback-secret-change-in-production';
+  }
+
+  private static get DEFAULT_EXPIRES_IN(): string {
+    return process.env.JWT_EXPIRES_IN || '24h';
+  }
 
   /**
    * Generate a JWT token for a user

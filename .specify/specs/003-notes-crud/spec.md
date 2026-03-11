@@ -1,7 +1,14 @@
 # Notes CRUD Operations - Specification
 
+**Spec ID**: 003
+**Status**: Implemented ✅
+**Created**: 2026-03-08
+**Updated**: 2026-03-11
+**Priority**: High
+**Depends On**: 001-authentication ✅ Complete
+
 ## Overview
-Core note-taking functionality allowing users to create, read, update, and delete their personal notes with rich content support.
+Core note-taking functionality allowing authenticated users to create, read, update, and delete their personal notes with rich text content support. Notes are private by default and strictly owned by the creating user.
 
 ## Requirements
 
@@ -141,11 +148,84 @@ Core note-taking functionality allowing users to create, read, update, and delet
 - Search and filtering functionality
 - Note organization and categorization
 
-## [NEEDS CLARIFICATION]
-- Rich text editor implementation timeline (currently using textarea)
-- Note sharing functionality interaction with this feature
-- Search and filtering requirements
-- Maximum note size limits and validation
+## Clarifications Resolved
+
+| Item | Decision |
+|---|---|
+| Rich text editor | Quill.js with Delta format (documented in `technical-implementation.md`) |
+| Note sharing | Out of scope — `isPublic` field reserved for future spec |
+| Search/filtering | Out of scope — text index created but search UI deferred |
+| Maximum note size | 500KB content limit, enforced in validation middleware |
+| Plain text API input | Auto-converted to Delta format server-side |
+
+## Technology Stack
+
+| Layer | Technology |
+|---|---|
+| Database | MongoDB via Mongoose ODM |
+| Validation | express-validator (already installed) |
+| Rich Text | Quill.js Delta JSON in MongoDB Mixed field |
+| Templates | Handlebars (configured in server.ts) |
+| Auth | `authenticateToken` middleware from auth system (001) |
+
+> **Important**: `plan.md` and `tasks.md` contain Prisma references from an earlier design iteration. All implementation uses **Mongoose** as documented in `technical-implementation.md`.
+
+## Implementation Phases
+
+### Phase 1: Data Foundation (2 days)
+- Note Mongoose model — `src/models/Note.ts`
+- `NoteService` class — `src/services/noteService.ts`
+- `ContentProcessor` utility — `src/utils/contentProcessor.ts`
+- Note validation middleware — `src/middleware/noteValidation.ts`
+- Ownership middleware — `src/middleware/noteOwnership.ts`
+
+### Phase 2: API Endpoints (1 day)
+- Notes router — `src/routes/noteRoutes.ts`
+- `NoteController` with all CRUD handlers — `src/controllers/noteController.ts`
+- Register router in `src/server.ts`
+
+### Phase 3: Frontend Templates (2 days)
+- `views/notes/list.handlebars` — paginated note cards
+- `views/notes/show.handlebars` — full note view
+- `views/notes/edit.handlebars` — Quill editor for create and edit
+- Quill.js bundle in `public/js/`
+- Update dashboard with link to `/notes`
+
+### Phase 4: Testing (1 day)
+- Unit tests: `NoteService`, `ContentProcessor`
+- Integration tests: all 7 note API endpoints
+- Security tests: cross-user access attempts
+- Coverage ≥ 80% (constitutional requirement)
+
+## Dependency Status
+
+### Completed Prerequisites
+- ✅ Authentication system (001) — JWT middleware, User model, MongoDB connection
+
+### New Dependencies Required
+- `isomorphic-dompurify` — HTML sanitisation for Delta-to-HTML rendering
+- Quill.js (CDN or local bundle)
+
+## API Endpoints Summary
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/notes` | Required | List user's notes (paginated) |
+| `POST` | `/notes` | Required | Create a new note |
+| `GET` | `/notes/new` | Required | Note creation form |
+| `GET` | `/notes/:id` | Required | View a single note |
+| `GET` | `/notes/:id/edit` | Required | Note edit form |
+| `PUT` | `/notes/:id` | Required | Update a note |
+| `DELETE` | `/notes/:id` | Required | Delete a note |
+
+## Success Criteria
+
+| Metric | Target |
+|---|---|
+| Note list query time | < 100ms (indexed) |
+| Create/update latency | < 200ms |
+| Ownership enforcement | 100% |
+| Test coverage (notes module) | ≥ 80% |
 
 ## Technical Implementation
-Detailed technical specifications, database schema, API endpoints, and implementation patterns are documented in `technical-implementation.md`.
+Full database schema, service layer patterns, content processing utilities, Handlebars template examples, and testing strategy are documented in [`technical-implementation.md`](technical-implementation.md).

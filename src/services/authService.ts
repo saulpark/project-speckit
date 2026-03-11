@@ -302,4 +302,99 @@ export class AuthService {
       return 0;
     }
   }
+
+  /**
+   * Request password reset - generates and returns reset token
+   * @param email - User's email address
+   * @returns Promise resolving to reset token or null if user not found
+   */
+  static async requestPasswordReset(email: string): Promise<{ token: string; expiresAt: Date } | null> {
+    try {
+      const normalizedEmail = email.toLowerCase().trim();
+
+      // Find user by email
+      const user = await User.findByEmail(normalizedEmail);
+      if (!user || !user.isActive) {
+        // For security, don't reveal if user exists
+        return null;
+      }
+
+      // Generate password reset token (15 minutes expiry)
+      const resetToken = JWTUtils.generateToken(
+        user._id.toString(),
+        user.email,
+        '15m'
+      );
+
+      return {
+        token: resetToken.token,
+        expiresAt: resetToken.expiresAt
+      };
+
+    } catch (error) {
+      console.error('Password reset request error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Reset user password with valid reset token
+   * @param resetToken - Password reset token
+   * @param newPassword - New password
+   * @returns Promise resolving to success status
+   */
+  static async resetPassword(resetToken: string, newPassword: string): Promise<boolean> {
+    try {
+      // Verify reset token
+      const tokenVerification = JWTUtils.verifyToken(resetToken);
+      if (!tokenVerification.valid || !tokenVerification.payload) {
+        throw new AuthError(
+          'Invalid or expired reset token',
+          'INVALID_RESET_TOKEN',
+          400
+        );
+      }
+
+      // Validate new password strength
+      const passwordValidation = PasswordUtils.validatePasswordStrength(newPassword);
+      if (!passwordValidation.isValid) {
+        throw new AuthError(
+          `Password validation failed: ${passwordValidation.errors.join(', ')}`,
+          'WEAK_PASSWORD',
+          400
+        );
+      }
+
+      // Find user by ID from token
+      const user = await User.findById(tokenVerification.payload.sub);
+      if (!user || !user.isActive) {
+        throw new AuthError(
+          'User account not found or inactive',
+          'USER_NOT_FOUND',
+          404
+        );
+      }
+
+      // Hash new password
+      const passwordHash = await PasswordUtils.hashPassword(newPassword);
+
+      // Update user's password
+      await User.findByIdAndUpdate(user._id, { passwordHash });
+
+      console.log(`🔑 Password reset successful for: ${user.email} (ID: ${user._id})`);
+      return true;
+
+    } catch (error) {
+      if (error instanceof AuthError) {
+        throw error;
+      }
+
+      console.error('Password reset error:', error);
+      throw new AuthError(
+        'Failed to reset password',
+        'PASSWORD_RESET_FAILED',
+        500
+      );
+    }
+  }
 }
