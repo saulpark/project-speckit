@@ -140,6 +140,38 @@ export function securityHeaders() {
         "base-uri 'self'; " +
         "form-action 'self'"
       );
+    } else if (req.path.includes('/notes')) {
+      // CSP for notes pages (allows Quill CDN)
+      res.setHeader('Content-Security-Policy',
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline' https://cdn.quilljs.com; " +
+        "style-src 'self' 'unsafe-inline' https://cdn.quilljs.com; " +
+        "img-src 'self' data: https:; " +
+        "font-src 'self' https:; " +
+        "connect-src 'self'; " +
+        "base-uri 'self'; " +
+        "form-action 'self'; " +
+        "frame-ancestors 'self'; " +
+        "object-src 'none'; " +
+        "script-src-attr 'none'; " +
+        "upgrade-insecure-requests"
+      );
+    } else {
+      // Default CSP for other pages
+      res.setHeader('Content-Security-Policy',
+        "default-src 'self'; " +
+        "script-src 'self' 'unsafe-inline'; " +
+        "style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data: https:; " +
+        "font-src 'self' https:; " +
+        "connect-src 'self'; " +
+        "base-uri 'self'; " +
+        "form-action 'self'; " +
+        "frame-ancestors 'self'; " +
+        "object-src 'none'; " +
+        "script-src-attr 'none'; " +
+        "upgrade-insecure-requests"
+      );
     }
 
     next();

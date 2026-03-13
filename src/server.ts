@@ -32,8 +32,10 @@ const PORT = process.env.PORT || 3000;
 // Apply security middlewares in order
 app.use(IPBlacklist.middleware()); // Block blacklisted IPs first
 app.use(requestSizeLimit()); // Limit request payload size
-app.use(helmet()); // Basic security headers
-app.use(securityHeaders()); // Additional security headers
+app.use(helmet({
+  contentSecurityPolicy: false // Disable helmet's default CSP, we'll set it manually
+})); // Basic security headers
+app.use(securityHeaders()); // Additional security headers with custom CSP
 app.use(securityLogger()); // Security logging
 
 // CORS configuration
