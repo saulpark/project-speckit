@@ -36,6 +36,8 @@ export class AuthController {
     try {
       const { email, password, firstName, lastName }: RegisterRequest = req.body;
 
+      console.log(`📝 Registration attempt for: ${email} (endpoint: ${req.originalUrl})`);
+
       // Register user through service layer
       const user = await AuthService.registerUser({ email, password });
 
@@ -90,6 +92,8 @@ export class AuthController {
     try {
       const { email, password, rememberMe }: LoginRequest = req.body;
 
+      console.log(`🔑 Login attempt for: ${email} (endpoint: ${req.originalUrl})`);
+
       // Authenticate user through service layer
       const authResult = await AuthService.authenticateUser(email, password);
 
@@ -98,6 +102,16 @@ export class AuthController {
 
       // Set session or token expiry based on rememberMe option
       const tokenExpiry = rememberMe ? '30d' : '24h';
+
+      // Set JWT token as HTTP-only cookie for web authentication
+      const cookieOptions = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'development' ? 'lax' as const : 'strict' as const,
+        path: '/',
+        maxAge: rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000 // 30 days or 24 hours
+      };
+      res.cookie('authToken', authResult.token.token, cookieOptions);
 
       // Return success response with user data and JWT token
       res.status(200).json({
@@ -154,6 +168,9 @@ export class AuthController {
         // No token provided, treat as successful logout (client-side)
         console.log('🚪 User logout requested (no token provided)');
 
+        // Clear auth cookie
+        res.clearCookie('authToken');
+
         res.status(200).json({
           success: true,
           message: 'Logout successful',
@@ -175,6 +192,9 @@ export class AuthController {
 
         console.log(`🚪 User logout: ${verification.payload.email} (ID: ${verification.payload.sub})`);
 
+        // Clear auth cookie
+        res.clearCookie('authToken');
+
         res.status(200).json({
           success: true,
           message: 'Logout successful',
@@ -188,6 +208,9 @@ export class AuthController {
       } else {
         // Token is invalid, but that's okay for logout
         console.log('🚪 User logout with invalid token (already expired)');
+
+        // Clear auth cookie
+        res.clearCookie('authToken');
 
         res.status(200).json({
           success: true,
@@ -293,12 +316,17 @@ export class AuthController {
       const existingUser = await AuthService.findUserByEmail(email);
       const available = !existingUser;
 
+      // Only return "already in use" message for registration contexts
+      // For login contexts, just return availability without the message
+      const isRegistrationContext = req.get('Referer')?.includes('/register') || req.headers['x-context'] === 'registration';
+
       res.status(200).json({
         success: true,
         data: {
           email,
           available,
-          message: available ? 'Email is available' : 'Email is already in use'
+          message: isRegistrationContext && !available ? 'Email is already in use' :
+                  isRegistrationContext && available ? 'Email is available' : 'Email checked'
         },
         timestamp: new Date().toISOString()
       });

@@ -1,0 +1,49 @@
+<div class="container-sm">
+  <div class="footer-content text-center text-muted">
+    <p class="mb-2">
+      &copy; {{currentYear}} SpecKit Authentication System
+    </p>
+    <div class="footer-links">
+      <a href="/health" class="text-muted">System Status</a>
+      {{#if showAuthLinks}}
+      <span class="mx-2">•</span>
+      <a href="/auth/login" class="text-muted">Login</a>
+      <span class="mx-2">•</span>
+      <a href="/auth/register" class="text-muted">Register</a>
+      {{/if}}
+    </div>
+    {{#if environment}}
+    <small class="mt-2 d-block">
+      Environment: {{environment}} | Version: {{version}}
+    </small>
+    {{/if}}
+  </div>
+</div>
+
+<style>
+.footer {
+  margin-top: auto;
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--gray-200);
+  background-color: var(--gray-50);
+  font-size: 0.875rem;
+}
+
+.footer-links a {
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.footer-links a:hover {
+  color: var(--primary);
+}
+
+.mx-2 {
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
+}
+
+.d-block {
+  display: block;
+}
+</style>

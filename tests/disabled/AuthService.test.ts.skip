@@ -1,0 +1,530 @@
+import { AuthService, AuthenticationResult, CreateUserData, UserResponse } from '../../../src/services/authService';
+import { User, IUser } from '../../../src/models/User';
+import { JWTUtils } from '../../../src/utils/jwt';
+import { TokenBlacklist } from '../../../src/services/TokenBlacklist';
+import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
+
+// Mock dependencies
+jest.mock('../../../src/utils/jwt');
+jest.mock('../../../src/services/TokenBlacklist');
+
+const mockJWTUtils = JWTUtils as jest.Mocked<typeof JWTUtils>;
+const mockTokenBlacklist = TokenBlacklist as jest.Mocked<typeof TokenBlacklist>;
+
+describe('AuthService', () => {
+  let mongoServer: MongoMemoryServer;
+  let authService: AuthService;
+
+  beforeAll(async () => {
+    mongoServer = await MongoMemoryServer.create();
+    const mongoUri = mongoServer.getUri();
+    await mongoose.connect(mongoUri);
+    authService = new AuthService();
+  });
+
+  afterAll(async () => {
+    await mongoose.disconnect();
+    await mongoServer.stop();
+  });
+
+  beforeEach(async () => {
+    await User.deleteMany({});
+    jest.clearAllMocks();
+
+    // Setup default mocks
+    mockJWTUtils.generateToken.mockReturnValue({
+      token: 'mock-jwt-token',
+      expiresIn: '24h',
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    });
+
+    mockJWTUtils.verifyToken.mockReturnValue({
+      valid: true,
+      payload: {
+        sub: 'user123',
+        email: 'test@example.com'
+      }
+    });
+
+    mockTokenBlacklist.isBlacklisted.mockResolvedValue(false);
+    mockTokenBlacklist.addToken.mockResolvedValue();
+  });
+
+  describe('User Registration', () => {
+    const validRegisterData: RegisterData = {
+      email: 'test@example.com',
+      password: 'TestPassword123!'
+    };
+
+    it('should register new user successfully', async () => {
+      const result: AuthResult = await authService.register(validRegisterData);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Registration successful');
+      expect(result.data).toHaveProperty('user');
+      expect(result.data).toHaveProperty('token');
+      expect(result.data?.user.email).toBe('test@example.com');
+      expect(mockJWTUtils.generateToken).toHaveBeenCalledWith(
+        expect.any(String),
+        'test@example.com'
+      );
+    });
+
+    it('should normalize email during registration', async () => {
+      const registerData: RegisterData = {
+        email: 'Test.Email@EXAMPLE.COM',
+        password: 'TestPassword123!'
+      };
+
+      const result: AuthResult = await authService.register(registerData);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.user.email).toBe('test.email@example.com');
+    });
+
+    it('should fail when email already exists', async () => {
+      // Create first user
+      await authService.register(validRegisterData);
+
+      // Try to register with same email
+      const result: AuthResult = await authService.register(validRegisterData);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('DUPLICATE_EMAIL');
+      expect(result.message).toContain('already registered');
+    });
+
+    it('should validate email format', async () => {
+      const invalidEmailData: RegisterData = {
+        email: 'invalid-email',
+        password: 'TestPassword123!'
+      };
+
+      const result: AuthResult = await authService.register(invalidEmailData);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('VALIDATION_ERROR');
+    });
+
+    it('should validate password strength', async () => {
+      const weakPasswordData: RegisterData = {
+        email: 'test@example.com',
+        password: '123'
+      };
+
+      const result: AuthResult = await authService.register(weakPasswordData);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('VALIDATION_ERROR');
+    });
+
+    it('should handle database errors gracefully', async () => {
+      // Mock mongoose to throw an error
+      const originalSave = User.prototype.save;
+      User.prototype.save = jest.fn().mockRejectedValue(new Error('Database error'));
+
+      const result: AuthResult = await authService.register(validRegisterData);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('REGISTRATION_FAILED');
+
+      // Restore original method
+      User.prototype.save = originalSave;
+    });
+  });
+
+  describe('User Login', () => {
+    let existingUser: IUser;
+
+    beforeEach(async () => {
+      const userData = {
+        email: 'test@example.com',
+        password: 'TestPassword123!'
+      };
+      existingUser = new User(userData);
+      await existingUser.save();
+    });
+
+    const validLoginCredentials: LoginCredentials = {
+      email: 'test@example.com',
+      password: 'TestPassword123!'
+    };
+
+    it('should login user successfully', async () => {
+      const result: AuthResult = await authService.login(validLoginCredentials);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Login successful');
+      expect(result.data).toHaveProperty('user');
+      expect(result.data).toHaveProperty('token');
+      expect(result.data?.user.email).toBe('test@example.com');
+      expect(mockJWTUtils.generateToken).toHaveBeenCalled();
+    });
+
+    it('should update lastLoginAt on successful login', async () => {
+      const originalLastLogin = existingUser.lastLoginAt;
+
+      await authService.login(validLoginCredentials);
+
+      const updatedUser = await User.findById(existingUser._id);
+      expect(updatedUser?.lastLoginAt).not.toEqual(originalLastLogin);
+      expect(updatedUser?.lastLoginAt).toBeInstanceOf(Date);
+    });
+
+    it('should fail with invalid email', async () => {
+      const invalidEmailCredentials: LoginCredentials = {
+        email: 'nonexistent@example.com',
+        password: 'TestPassword123!'
+      };
+
+      const result: AuthResult = await authService.login(invalidEmailCredentials);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('INVALID_CREDENTIALS');
+      expect(result.message).toBe('Invalid email or password');
+    });
+
+    it('should fail with invalid password', async () => {
+      const invalidPasswordCredentials: LoginCredentials = {
+        email: 'test@example.com',
+        password: 'WrongPassword'
+      };
+
+      const result: AuthResult = await authService.login(invalidPasswordCredentials);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('INVALID_CREDENTIALS');
+      expect(result.message).toBe('Invalid email or password');
+    });
+
+    it('should fail if user account is inactive', async () => {
+      existingUser.isActive = false;
+      await existingUser.save();
+
+      const result: AuthResult = await authService.login(validLoginCredentials);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('ACCOUNT_INACTIVE');
+      expect(result.message).toContain('deactivated');
+    });
+
+    it('should normalize email for login', async () => {
+      const upperCaseEmailCredentials: LoginCredentials = {
+        email: 'TEST@EXAMPLE.COM',
+        password: 'TestPassword123!'
+      };
+
+      const result: AuthResult = await authService.login(upperCaseEmailCredentials);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should handle remember me option', async () => {
+      const credentialsWithRememberMe: LoginCredentials = {
+        email: 'test@example.com',
+        password: 'TestPassword123!',
+        rememberMe: true
+      };
+
+      const result: AuthResult = await authService.login(credentialsWithRememberMe);
+
+      expect(result.success).toBe(true);
+      expect(mockJWTUtils.generateToken).toHaveBeenCalledWith(
+        expect.any(String),
+        'test@example.com',
+        '7d' // Extended expiry for remember me
+      );
+    });
+  });
+
+  describe('Token Verification', () => {
+    let existingUser: IUser;
+
+    beforeEach(async () => {
+      const userData = {
+        email: 'test@example.com',
+        password: 'TestPassword123!'
+      };
+      existingUser = new User(userData);
+      await existingUser.save();
+    });
+
+    it('should verify valid token successfully', async () => {
+      mockJWTUtils.verifyToken.mockReturnValue({
+        valid: true,
+        payload: {
+          sub: existingUser._id.toString(),
+          email: 'test@example.com'
+        }
+      });
+
+      const result = await authService.verifyToken('valid-token');
+
+      expect(result.success).toBe(true);
+      expect(result.data?.user).toBeDefined();
+      expect(result.data?.user.email).toBe('test@example.com');
+    });
+
+    it('should fail for invalid token', async () => {
+      mockJWTUtils.verifyToken.mockReturnValue({
+        valid: false,
+        error: 'Invalid token'
+      });
+
+      const result = await authService.verifyToken('invalid-token');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('TOKEN_INVALID');
+    });
+
+    it('should fail for blacklisted token', async () => {
+      mockTokenBlacklist.isBlacklisted.mockResolvedValue(true);
+
+      const result = await authService.verifyToken('blacklisted-token');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('TOKEN_BLACKLISTED');
+      expect(result.message).toContain('revoked');
+    });
+
+    it('should fail if user not found', async () => {
+      mockJWTUtils.verifyToken.mockReturnValue({
+        valid: true,
+        payload: {
+          sub: new mongoose.Types.ObjectId().toString(),
+          email: 'nonexistent@example.com'
+        }
+      });
+
+      const result = await authService.verifyToken('valid-token');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('USER_NOT_FOUND');
+    });
+
+    it('should fail if user account is inactive', async () => {
+      existingUser.isActive = false;
+      await existingUser.save();
+
+      mockJWTUtils.verifyToken.mockReturnValue({
+        valid: true,
+        payload: {
+          sub: existingUser._id.toString(),
+          email: 'test@example.com'
+        }
+      });
+
+      const result = await authService.verifyToken('valid-token');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('ACCOUNT_INACTIVE');
+    });
+  });
+
+  describe('User Logout', () => {
+    it('should logout user successfully', async () => {
+      const token = 'valid-token';
+      mockJWTUtils.getTokenExpiration.mockReturnValue(new Date(Date.now() + 3600000));
+
+      const result = await authService.logout(token);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Logout successful');
+      expect(mockTokenBlacklist.addToken).toHaveBeenCalledWith(
+        token,
+        expect.any(Date)
+      );
+    });
+
+    it('should handle logout without token expiration', async () => {
+      const token = 'token-without-expiry';
+      mockJWTUtils.getTokenExpiration.mockReturnValue(null);
+
+      const result = await authService.logout(token);
+
+      expect(result.success).toBe(true);
+      expect(mockTokenBlacklist.addToken).toHaveBeenCalledWith(
+        token,
+        expect.any(Date)
+      );
+    });
+
+    it('should handle blacklist errors gracefully', async () => {
+      mockTokenBlacklist.addToken.mockRejectedValue(new Error('Blacklist error'));
+
+      const result = await authService.logout('valid-token');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('LOGOUT_FAILED');
+    });
+  });
+
+  describe('User Profile Retrieval', () => {
+    let existingUser: IUser;
+
+    beforeEach(async () => {
+      const userData = {
+        email: 'test@example.com',
+        password: 'TestPassword123!',
+        profile: {
+          firstName: 'John',
+          lastName: 'Doe'
+        }
+      };
+      existingUser = new User(userData);
+      await existingUser.save();
+    });
+
+    it('should get user profile successfully', async () => {
+      const result = await authService.getUserProfile(existingUser._id.toString());
+
+      expect(result.success).toBe(true);
+      expect(result.data?.user).toBeDefined();
+      expect(result.data?.user.email).toBe('test@example.com');
+      expect(result.data?.user.profile?.firstName).toBe('John');
+    });
+
+    it('should fail for non-existent user', async () => {
+      const nonExistentId = new mongoose.Types.ObjectId().toString();
+
+      const result = await authService.getUserProfile(nonExistentId);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('USER_NOT_FOUND');
+    });
+
+    it('should fail for invalid user ID', async () => {
+      const result = await authService.getUserProfile('invalid-id');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('INVALID_USER_ID');
+    });
+
+    it('should exclude password from profile response', async () => {
+      const result = await authService.getUserProfile(existingUser._id.toString());
+
+      expect(result.success).toBe(true);
+      expect(result.data?.user).not.toHaveProperty('password');
+    });
+  });
+
+  describe('Email Availability Check', () => {
+    beforeEach(async () => {
+      const existingUser = new User({
+        email: 'existing@example.com',
+        password: 'TestPassword123!'
+      });
+      await existingUser.save();
+    });
+
+    it('should return available for new email', async () => {
+      const result = await authService.checkEmailAvailability('new@example.com');
+
+      expect(result.success).toBe(true);
+      expect(result.data?.available).toBe(true);
+      expect(result.message).toContain('available');
+    });
+
+    it('should return unavailable for existing email', async () => {
+      const result = await authService.checkEmailAvailability('existing@example.com');
+
+      expect(result.success).toBe(true);
+      expect(result.data?.available).toBe(false);
+      expect(result.message).toContain('already taken');
+    });
+
+    it('should normalize email before checking', async () => {
+      const result = await authService.checkEmailAvailability('EXISTING@EXAMPLE.COM');
+
+      expect(result.success).toBe(true);
+      expect(result.data?.available).toBe(false);
+    });
+
+    it('should handle invalid email format', async () => {
+      const result = await authService.checkEmailAvailability('invalid-email');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('INVALID_EMAIL');
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('should handle database connection errors', async () => {
+      await mongoose.disconnect();
+
+      const result = await authService.login({
+        email: 'test@example.com',
+        password: 'TestPassword123!'
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('DATABASE_ERROR');
+
+      // Reconnect for other tests
+      const mongoUri = mongoServer.getUri();
+      await mongoose.connect(mongoUri);
+    });
+
+    it('should handle JWT generation errors', async () => {
+      mockJWTUtils.generateToken.mockImplementation(() => {
+        throw new Error('JWT generation failed');
+      });
+
+      const userData = {
+        email: 'test@example.com',
+        password: 'TestPassword123!'
+      };
+      const user = new User(userData);
+      await user.save();
+
+      const result = await authService.login({
+        email: 'test@example.com',
+        password: 'TestPassword123!'
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('TOKEN_GENERATION_FAILED');
+    });
+  });
+
+  describe('Input Validation and Sanitization', () => {
+    it('should trim whitespace from email', async () => {
+      const registerData: RegisterData = {
+        email: '  test@example.com  ',
+        password: 'TestPassword123!'
+      };
+
+      const result = await authService.register(registerData);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.user.email).toBe('test@example.com');
+    });
+
+    it('should handle special characters in email', async () => {
+      const specialEmail = 'test+special@example-domain.co.uk';
+      const registerData: RegisterData = {
+        email: specialEmail,
+        password: 'TestPassword123!'
+      };
+
+      const result = await authService.register(registerData);
+
+      expect(result.success).toBe(true);
+      expect(result.data?.user.email).toBe(specialEmail.toLowerCase());
+    });
+
+    it('should validate email length limits', async () => {
+      const longEmail = 'a'.repeat(250) + '@example.com';
+      const registerData: RegisterData = {
+        email: longEmail,
+        password: 'TestPassword123!'
+      };
+
+      const result = await authService.register(registerData);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('VALIDATION_ERROR');
+    });
+  });
+});

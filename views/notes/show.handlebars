@@ -1,0 +1,674 @@
+{{#if access.canEdit}}
+<link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
+{{/if}}
+
+<div class="container" style="max-width: 800px; margin: 0 auto; padding: 2rem 1rem;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <a href="/notes" style="color: #4361ee; text-decoration: none; font-size: 0.875rem;">&larr; Back to Notes</a>
+    <div style="display: flex; gap: 0.5rem;">
+      {{#if access.canShare}}
+      <button id="shareBtn" style="padding: 0.375rem 0.875rem; border: 1px solid #38a169; color: #38a169; background: transparent; border-radius: 4px; font-size: 0.875rem; cursor: pointer;">Share</button>
+      {{/if}}
+      {{#if access.canEdit}}
+      <a href="/notes/{{note._id}}/edit" style="padding: 0.375rem 0.875rem; border: 1px solid #718096; color: #4a5568; text-decoration: none; border-radius: 4px; font-size: 0.875rem;">Edit</a>
+      <button id="deleteBtn" style="padding: 0.375rem 0.875rem; border: 1px solid #e53e3e; color: #e53e3e; background: transparent; border-radius: 4px; font-size: 0.875rem; cursor: pointer;">Delete</button>
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="card" style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 2rem;">
+    <h1 style="margin: 0 0 1rem 0; color: #1a202c; font-size: 1.75rem;">{{note.title}}</h1>
+    <div style="color: #718096; font-size: 0.875rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <span>Updated {{note.updatedAt}}</span>
+          <span style="margin: 0 0.5rem;">&#183;</span>
+          <span>Created {{note.createdAt}}</span>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+          {{#if access.isShared}}
+          <span style="padding: 0.125rem 0.5rem; background: #bee3f8; color: #2b6cb0; border-radius: 4px; font-size: 0.75rem;">📤 Shared with you</span>
+          {{/if}}
+          <div id="sharingStatus" style="display: flex; gap: 0.5rem; align-items: center;">
+            <!-- Sharing status will be populated by JavaScript -->
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Note Content Display/Edit -->
+    <div id="noteContentContainer">
+      <div id="noteContent" style="line-height: 1.7; color: #2d3748; min-height: 200px; {{#if access.canEdit}}cursor: text;{{/if}} padding: 1rem; border-radius: 4px; transition: border 0.2s; border: 1px solid transparent;" {{#if access.canEdit}}onclick="enableInlineEdit()"{{/if}}>
+        {{{htmlContent}}}
+        {{#if access.canEdit}}
+        <div id="editHint" style="color: #718096; font-size: 0.875rem; font-style: italic; margin-top: 1rem; opacity: 0; transition: opacity 0.2s;">Click here to edit content...</div>
+        {{/if}}
+      </div>
+
+      {{#if access.canEdit}}
+      <!-- Inline Editor (hidden by default) -->
+      <div id="inlineEditor" style="display: none;">
+        <div id="quillEditor" style="min-height: 300px; border: 1px solid #4361ee; border-radius: 4px; background: white;"></div>
+        <div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center;">
+          <button id="saveInlineBtn" style="padding: 0.5rem 1rem; background: #4361ee; color: white; border: none; border-radius: 4px; font-size: 0.875rem; cursor: pointer;">Save</button>
+          <button id="cancelInlineBtn" style="padding: 0.5rem 1rem; border: 1px solid #718096; color: #4a5568; background: transparent; border-radius: 4px; font-size: 0.875rem; cursor: pointer;">Cancel</button>
+          <div id="inlineStatus" style="margin-left: 1rem; font-size: 0.875rem; color: #718096;"></div>
+        </div>
+      </div>
+      {{/if}}
+    </div>
+    {{#if note.tags.length}}
+    <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      {{#each note.tags}}
+        <span style="padding: 0.25rem 0.625rem; background: #ebf4ff; color: #3182ce; border-radius: 9999px; font-size: 0.75rem;">{{this}}</span>
+      {{/each}}
+    </div>
+    {{/if}}
+  </div>
+</div>
+
+<!-- Sharing Modal -->
+<div id="shareModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 2rem; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+      <h3 style="margin: 0; color: #1a202c; font-size: 1.25rem;">Share Note</h3>
+      <button id="closeModalBtn" style="background: transparent; border: none; font-size: 1.5rem; cursor: pointer; color: #718096;">&times;</button>
+    </div>
+
+    <!-- Public Sharing Section -->
+    <div style="margin-bottom: 2rem; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <div>
+          <h4 style="margin: 0 0 0.25rem 0; color: #1a202c; font-size: 1rem;">Public Link</h4>
+          <p style="margin: 0; color: #718096; font-size: 0.875rem;">Anyone with the link can view this note</p>
+        </div>
+        <button id="togglePublicBtn" style="padding: 0.5rem 1rem; border: 1px solid #4361ee; color: #4361ee; background: transparent; border-radius: 4px; font-size: 0.875rem; cursor: pointer;">
+          <span id="publicToggleText">Enable</span>
+        </button>
+      </div>
+      <div id="publicLinkSection" style="display: none;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <input id="publicLinkInput" type="text" readonly style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; background: #f7fafc; font-family: monospace; font-size: 0.875rem;">
+          <button id="copyLinkBtn" style="padding: 0.5rem 1rem; background: #4361ee; color: white; border: none; border-radius: 4px; font-size: 0.875rem; cursor: pointer;">Copy</button>
+        </div>
+        <p id="copyFeedback" style="margin: 0.5rem 0 0 0; color: #38a169; font-size: 0.75rem; opacity: 0;">Link copied to clipboard!</p>
+      </div>
+    </div>
+
+    <!-- User Sharing Section -->
+    <div style="margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #e2e8f0; border-radius: 8px;">
+      <h4 style="margin: 0 0 0.75rem 0; color: #1a202c; font-size: 1rem;">Share with Users</h4>
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+        <input id="emailInput" type="email" placeholder="Enter email address" style="flex: 1; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 0.875rem;">
+        <button id="shareWithUserBtn" style="padding: 0.5rem 1rem; background: #38a169; color: white; border: none; border-radius: 4px; font-size: 0.875rem; cursor: pointer;">Share</button>
+      </div>
+      <div id="userSharingFeedback" style="margin-bottom: 1rem; font-size: 0.875rem;"></div>
+
+      <!-- List of shared users -->
+      <div id="sharedUsersList">
+        <h5 style="margin: 0 0 0.5rem 0; color: #4a5568; font-size: 0.875rem; font-weight: 600;">Shared with:</h5>
+        <div id="sharedUsersContainer" style="max-height: 150px; overflow-y: auto;">
+          <!-- Shared users will be populated by JavaScript -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading indicator -->
+    <div id="loadingIndicator" style="display: none; text-align: center; padding: 1rem; color: #718096;">
+      <span style="font-size: 0.875rem;">Loading...</span>
+    </div>
+  </div>
+</div>
+
+{{#if access.canEdit}}
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+{{/if}}
+
+<script>
+{{#if access.canEdit}}
+// Inline editing functionality
+let quillInstance = null;
+let isEditingInline = false;
+let originalContent = null;
+
+function enableInlineEdit() {
+  if (isEditingInline) return;
+
+  isEditingInline = true;
+
+  // Hide content display and show editor
+  document.getElementById('noteContent').style.display = 'none';
+  document.getElementById('inlineEditor').style.display = 'block';
+
+  // Initialize Quill editor if not already done
+  if (!quillInstance) {
+    quillInstance = new Quill('#quillEditor', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          ['bold', 'italic', 'underline'],
+          ['blockquote', 'code-block'],
+          [{ 'header': 1 }, { 'header': 2 }],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          ['link', 'clean']
+        ]
+      }
+    });
+
+    // Auto-save functionality
+    let saveTimeout;
+    quillInstance.on('text-change', function() {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(autoSaveInline, 2000);
+    });
+  }
+
+  // Load current content
+  try {
+    {{#if note.content.data}}
+    var existingContent = {{{json note.content.data}}};
+    if (existingContent && existingContent.ops) {
+      quillInstance.setContents(existingContent);
+      originalContent = JSON.stringify(existingContent);
+    }
+    {{/if}}
+  } catch (e) {
+    console.warn('Could not load existing content:', e);
+  }
+
+  // Focus the editor
+  setTimeout(function() {
+    quillInstance.focus();
+  }, 100);
+}
+
+function disableInlineEdit() {
+  if (!isEditingInline) return;
+
+  isEditingInline = false;
+
+  // Show content display and hide editor
+  document.getElementById('noteContent').style.display = 'block';
+  document.getElementById('inlineEditor').style.display = 'none';
+
+  showInlineStatus('');
+}
+
+function saveInlineContent() {
+  if (!quillInstance) return;
+
+  const delta = quillInstance.getContents();
+  const title = '{{note.title}}'; // Keep current title
+
+  showInlineStatus('Saving...', 'info');
+
+  fetch('/notes/{{note._id}}', {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      title: title,
+      content: {
+        type: 'delta',
+        data: delta
+      }
+    })
+  })
+  .then(function(res) {
+    return res.json().then(function(data) {
+      return { status: res.status, data: data };
+    });
+  })
+  .then(function(result) {
+    if (result.data.success) {
+      showInlineStatus('Saved!', 'success');
+      originalContent = JSON.stringify(delta);
+
+      // Update the display content
+      setTimeout(function() {
+        window.location.reload(); // Reload to show updated content
+      }, 1000);
+    } else {
+      showInlineStatus('Save failed: ' + (result.data.message || 'Unknown error'), 'error');
+    }
+  })
+  .catch(function(err) {
+    showInlineStatus('Save failed: ' + err.message, 'error');
+  });
+}
+
+function cancelInlineEdit() {
+  if (originalContent && quillInstance) {
+    try {
+      quillInstance.setContents(JSON.parse(originalContent));
+    } catch (e) {
+      console.warn('Could not restore original content:', e);
+    }
+  }
+  disableInlineEdit();
+}
+
+function autoSaveInline() {
+  if (!quillInstance || !isEditingInline) return;
+
+  const delta = quillInstance.getContents();
+  const title = '{{note.title}}';
+
+  fetch('/notes/{{note._id}}', {
+    method: 'PUT',
+    headers: {
+      'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      title: title,
+      content: {
+        type: 'delta',
+        data: delta
+      }
+    })
+  })
+  .then(function(res) { return res.json(); })
+  .then(function(data) {
+    if (data.success) {
+      showInlineStatus('Auto-saved', 'success');
+      originalContent = JSON.stringify(delta);
+    }
+  })
+  .catch(function(err) {
+    console.error('Auto-save failed:', err);
+  });
+}
+
+function showInlineStatus(message, type) {
+  const el = document.getElementById('inlineStatus');
+  el.textContent = message;
+  if (type === 'error') {
+    el.style.color = '#e53e3e';
+  } else if (type === 'success') {
+    el.style.color = '#48bb78';
+  } else {
+    el.style.color = '#718096';
+  }
+
+  if (message && type !== 'info') {
+    setTimeout(function() {
+      if (el.textContent === message) {
+        el.textContent = '';
+      }
+    }, 3000);
+  }
+}
+
+// Event listeners for inline editing buttons
+document.addEventListener('DOMContentLoaded', function() {
+  const saveBtn = document.getElementById('saveInlineBtn');
+  const cancelBtn = document.getElementById('cancelInlineBtn');
+
+  if (saveBtn) {
+    saveBtn.addEventListener('click', saveInlineContent);
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', cancelInlineEdit);
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    if (isEditingInline) {
+      if (e.key === 'Escape') {
+        cancelInlineEdit();
+      } else if (e.ctrlKey && e.key === 's') {
+        e.preventDefault();
+        saveInlineContent();
+      }
+    }
+  });
+});
+
+// Add hover effect for edit hint
+document.getElementById('noteContent').addEventListener('mouseenter', function() {
+  if (!isEditingInline) {
+    this.style.border = '1px dashed #e2e8f0';
+    const editHint = document.getElementById('editHint');
+    if (editHint) {
+      editHint.style.opacity = '0.7';
+    }
+  }
+});
+
+document.getElementById('noteContent').addEventListener('mouseleave', function() {
+  if (!isEditingInline) {
+    this.style.border = '1px solid transparent';
+    const editHint = document.getElementById('editHint');
+    if (editHint) {
+      editHint.style.opacity = '0';
+    }
+  }
+});
+{{/if}}
+
+// Note sharing functionality
+let currentSharingInfo = null;
+
+// Initialize sharing status on page load
+document.addEventListener('DOMContentLoaded', function() {
+  loadSharingInfo();
+});
+
+// Delete functionality (existing)
+{{#if access.canEdit}}
+document.getElementById('deleteBtn').addEventListener('click', function() {
+  if (!confirm('Are you sure you want to delete this note? This cannot be undone.')) return;
+
+  fetch('/notes/{{note._id}}', {
+    method: 'DELETE',
+    headers: {
+      'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(function(res) {
+    if (res.ok) {
+      window.location.href = '/notes';
+    } else {
+      return res.json().then(function(data) {
+        alert('Delete failed: ' + (data.message || 'Unknown error'));
+      });
+    }
+  })
+  .catch(function(err) {
+    alert('Delete failed: ' + err.message);
+  });
+});
+{{/if}}
+
+// Sharing modal functionality
+{{#if access.canShare}}
+document.getElementById('shareBtn').addEventListener('click', function() {
+  document.getElementById('shareModal').style.display = 'block';
+  loadSharingInfo();
+});
+
+document.getElementById('closeModalBtn').addEventListener('click', function() {
+  document.getElementById('shareModal').style.display = 'none';
+});
+
+// Close modal when clicking outside
+document.getElementById('shareModal').addEventListener('click', function(e) {
+  if (e.target === this) {
+    this.style.display = 'none';
+  }
+});
+
+// Public sharing toggle
+document.getElementById('togglePublicBtn').addEventListener('click', function() {
+  togglePublicSharing();
+});
+
+// Copy public link
+document.getElementById('copyLinkBtn').addEventListener('click', function() {
+  copyPublicLink();
+});
+
+// Share with user
+document.getElementById('shareWithUserBtn').addEventListener('click', function() {
+  shareWithUser();
+});
+
+// Handle Enter key in email input
+document.getElementById('emailInput').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    shareWithUser();
+  }
+});
+
+// Load sharing information
+function loadSharingInfo() {
+  showLoading(true);
+
+  fetch('/notes/{{note._id}}/sharing', {
+    headers: {
+      'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+    }
+  })
+  .then(function(res) {
+    if (res.ok) {
+      return res.json();
+    }
+    throw new Error('Failed to load sharing info');
+  })
+  .then(function(data) {
+    currentSharingInfo = data.data;
+    updateSharingUI();
+  })
+  .catch(function(err) {
+    console.error('Failed to load sharing info:', err);
+    showUserFeedback('Failed to load sharing information', 'error');
+  })
+  .finally(function() {
+    showLoading(false);
+  });
+}
+
+// Toggle public sharing
+function togglePublicSharing() {
+  showLoading(true);
+
+  fetch('/notes/{{note._id}}/share/public', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(function(res) {
+    if (res.ok) {
+      return res.json();
+    }
+    throw new Error('Failed to toggle sharing');
+  })
+  .then(function(data) {
+    currentSharingInfo.isPublic = data.data.isPublic;
+    currentSharingInfo.publicUrl = data.data.publicUrl;
+    updateSharingUI();
+    updateSharingStatus();
+    showUserFeedback(data.message, 'success');
+  })
+  .catch(function(err) {
+    console.error('Failed to toggle sharing:', err);
+    showUserFeedback('Failed to toggle public sharing', 'error');
+  })
+  .finally(function() {
+    showLoading(false);
+  });
+}
+
+// Copy public link to clipboard
+function copyPublicLink() {
+  const linkInput = document.getElementById('publicLinkInput');
+  linkInput.select();
+  linkInput.setSelectionRange(0, 99999); // For mobile devices
+
+  try {
+    document.execCommand('copy');
+    showCopyFeedback();
+  } catch (err) {
+    console.error('Failed to copy link:', err);
+    showUserFeedback('Failed to copy link to clipboard', 'error');
+  }
+}
+
+// Share with specific user
+function shareWithUser() {
+  const email = document.getElementById('emailInput').value.trim();
+
+  if (!email) {
+    showUserFeedback('Please enter an email address', 'error');
+    return;
+  }
+
+  showLoading(true);
+
+  fetch('/notes/{{note._id}}/share/user', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ email: email })
+  })
+  .then(function(res) {
+    if (res.ok) {
+      return res.json();
+    }
+    return res.json().then(function(data) {
+      throw new Error(data.message || 'Failed to share note');
+    });
+  })
+  .then(function(data) {
+    document.getElementById('emailInput').value = '';
+    currentSharingInfo.sharedWith = data.data.sharedWith.map(function(user) {
+      return {
+        email: user.email,
+        grantedAt: user.grantedAt
+      };
+    });
+    updateSharingUI();
+    updateSharingStatus();
+    showUserFeedback(data.message, 'success');
+  })
+  .catch(function(err) {
+    console.error('Failed to share note:', err);
+    showUserFeedback(err.message, 'error');
+  })
+  .finally(function() {
+    showLoading(false);
+  });
+}
+
+// Remove user from sharing
+function unshareWithUser(userId, email) {
+  if (!confirm('Remove sharing access for ' + email + '?')) return;
+
+  showLoading(true);
+
+  fetch('/notes/{{note._id}}/share/user/' + userId, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
+    }
+  })
+  .then(function(res) {
+    if (res.ok) {
+      return res.json();
+    }
+    throw new Error('Failed to remove user access');
+  })
+  .then(function(data) {
+    // Remove from current sharing info
+    currentSharingInfo.sharedWith = currentSharingInfo.sharedWith.filter(function(user) {
+      return user.userId !== userId;
+    });
+    updateSharingUI();
+    updateSharingStatus();
+    showUserFeedback(data.message, 'success');
+  })
+  .catch(function(err) {
+    console.error('Failed to remove user access:', err);
+    showUserFeedback('Failed to remove user access', 'error');
+  })
+  .finally(function() {
+    showLoading(false);
+  });
+}
+
+// Update sharing UI based on current sharing info
+function updateSharingUI() {
+  if (!currentSharingInfo) return;
+
+  // Update public sharing section
+  const publicToggleText = document.getElementById('publicToggleText');
+  const publicLinkSection = document.getElementById('publicLinkSection');
+  const publicLinkInput = document.getElementById('publicLinkInput');
+  const toggleBtn = document.getElementById('togglePublicBtn');
+
+  if (currentSharingInfo.isPublic) {
+    publicToggleText.textContent = 'Disable';
+    toggleBtn.style.backgroundColor = '#e53e3e';
+    toggleBtn.style.color = 'white';
+    toggleBtn.style.borderColor = '#e53e3e';
+    publicLinkSection.style.display = 'block';
+    publicLinkInput.value = currentSharingInfo.publicUrl || '';
+  } else {
+    publicToggleText.textContent = 'Enable';
+    toggleBtn.style.backgroundColor = 'transparent';
+    toggleBtn.style.color = '#4361ee';
+    toggleBtn.style.borderColor = '#4361ee';
+    publicLinkSection.style.display = 'none';
+  }
+
+  // Update shared users list
+  const sharedUsersContainer = document.getElementById('sharedUsersContainer');
+  if (currentSharingInfo.sharedWith && currentSharingInfo.sharedWith.length > 0) {
+    sharedUsersContainer.innerHTML = currentSharingInfo.sharedWith.map(function(user) {
+      return '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 0.5rem;">' +
+        '<div>' +
+        '<div style="font-weight: 500; color: #1a202c;">' + user.email + '</div>' +
+        '<div style="font-size: 0.75rem; color: #718096;">Shared ' + new Date(user.grantedAt).toLocaleDateString() + '</div>' +
+        '</div>' +
+        '<button onclick="unshareWithUser(\'' + user.userId + '\', \'' + user.email + '\')" style="padding: 0.25rem 0.5rem; background: #fed7d7; color: #e53e3e; border: none; border-radius: 4px; font-size: 0.75rem; cursor: pointer;">Remove</button>' +
+        '</div>';
+    }).join('');
+  } else {
+    sharedUsersContainer.innerHTML = '<div style="padding: 1rem; text-align: center; color: #718096; font-size: 0.875rem;">Not shared with any users yet</div>';
+  }
+}
+
+// Update sharing status indicator
+function updateSharingStatus() {
+  const statusContainer = document.getElementById('sharingStatus');
+  let statusHTML = '';
+
+  if (currentSharingInfo && currentSharingInfo.isPublic) {
+    statusHTML += '<span style="padding: 0.125rem 0.5rem; background: #c6f6d5; color: #22543d; border-radius: 4px; font-size: 0.75rem;">🌐 Public</span>';
+  }
+
+  if (currentSharingInfo && currentSharingInfo.sharedWith && currentSharingInfo.sharedWith.length > 0) {
+    statusHTML += '<span style="padding: 0.125rem 0.5rem; background: #bee3f8; color: #2b6cb0; border-radius: 4px; font-size: 0.75rem;">👥 ' + currentSharingInfo.sharedWith.length + ' user' + (currentSharingInfo.sharedWith.length > 1 ? 's' : '') + '</span>';
+  }
+
+  statusContainer.innerHTML = statusHTML;
+}
+
+// Show loading indicator
+function showLoading(show) {
+  document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+}
+
+// Show copy feedback
+function showCopyFeedback() {
+  const feedback = document.getElementById('copyFeedback');
+  feedback.style.opacity = '1';
+  setTimeout(function() {
+    feedback.style.opacity = '0';
+  }, 2000);
+}
+
+// Show user feedback messages
+function showUserFeedback(message, type) {
+  const feedbackDiv = document.getElementById('userSharingFeedback');
+  const isError = type === 'error';
+
+  feedbackDiv.innerHTML = '<div style="padding: 0.5rem; border-radius: 4px; background: ' +
+    (isError ? '#fed7d7' : '#c6f6d5') + '; color: ' +
+    (isError ? '#e53e3e' : '#22543d') + '; font-size: 0.875rem;">' +
+    message + '</div>';
+
+  setTimeout(function() {
+    feedbackDiv.innerHTML = '';
+  }, 5000);
+}
+{{/if}}
+</script>

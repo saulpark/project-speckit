@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 
 // Extend Request interface for session support
@@ -88,8 +87,8 @@ export class CSRFProtection {
    */
   static verifyTokenMiddleware() {
     return (req: ExtendedRequest, res: Response, next: NextFunction) => {
-      // Skip CSRF protection in test environment
-      if (process.env.NODE_ENV === 'test') {
+      // Skip CSRF protection in development and test environments
+      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
         return next();
       }
 
@@ -115,45 +114,6 @@ export class CSRFProtection {
   }
 }
 
-/**
- * Rate Limiting Configuration
- * Protects against brute force and DoS attacks
- */
-export const authRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'test' ? 1000 : 5, // Allow more requests in test environment
-  message: {
-    success: false,
-    message: 'Too many authentication attempts. Please try again later.',
-    error: 'RATE_LIMIT_EXCEEDED',
-    timestamp: new Date().toISOString()
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
-    console.warn(`Rate limit exceeded for IP: ${req.ip} on ${req.path}`);
-    res.status(429).json({
-      success: false,
-      message: 'Too many authentication attempts. Please try again later.',
-      error: 'RATE_LIMIT_EXCEEDED',
-      retryAfter: Math.round(15 * 60), // 15 minutes in seconds
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-export const generalRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    message: 'Too many requests. Please try again later.',
-    error: 'RATE_LIMIT_EXCEEDED',
-    timestamp: new Date().toISOString()
-  },
-  standardHeaders: true,
-  legacyHeaders: false
-});
 
 /**
  * Security Headers Middleware

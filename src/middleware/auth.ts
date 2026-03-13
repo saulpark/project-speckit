@@ -18,8 +18,70 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
- * Authentication middleware to protect routes
- * Verifies JWT token and adds user context to request
+ * Web authentication middleware that redirects to login on failure
+ * Use this for pages that should show HTML views
+ */
+export const authenticateWeb = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Extract token from Authorization header OR cookies
+    const authHeader = req.headers['authorization'];
+    let token = JWTUtils.extractTokenFromHeader(authHeader);
+
+    // If no auth header, try to get from cookies (for web sessions)
+    if (!token && req.cookies && req.cookies.authToken) {
+      token = req.cookies.authToken;
+    }
+
+    if (!token) {
+      // Redirect to login for web requests
+      const currentPath = encodeURIComponent(req.originalUrl);
+      res.redirect(`/auth/login?redirect=${currentPath}`);
+      return;
+    }
+
+    // Verify token
+    const verification = JWTUtils.verifyToken(token);
+
+    if (!verification.valid || !verification.payload) {
+      // Redirect to login for invalid tokens
+      const currentPath = encodeURIComponent(req.originalUrl);
+      res.redirect(`/auth/login?redirect=${currentPath}`);
+      return;
+    }
+
+    // Check if token is blacklisted
+    const isBlacklisted = await TokenBlacklistService.isTokenBlacklisted(token);
+    if (isBlacklisted) {
+      const currentPath = encodeURIComponent(req.originalUrl);
+      res.redirect(`/auth/login?redirect=${currentPath}`);
+      return;
+    }
+
+    // Get user data and attach to request
+    const userResponse = await AuthService.findUserById(verification.payload.sub);
+    if (!userResponse) {
+      const currentPath = encodeURIComponent(req.originalUrl);
+      res.redirect(`/auth/login?redirect=${currentPath}`);
+      return;
+    }
+    req.user = userResponse;
+    req.tokenPayload = verification.payload;
+
+    next();
+  } catch (error) {
+    console.error('Web authentication error:', error);
+    const currentPath = encodeURIComponent(req.originalUrl);
+    res.redirect(`/auth/login?redirect=${currentPath}`);
+  }
+};
+
+/**
+ * API authentication middleware that returns JSON on failure
+ * Use this for API endpoints that should return JSON responses
  */
 export const authenticateToken = async (
   req: AuthenticatedRequest,
@@ -107,7 +169,12 @@ export const optionalAuthentication = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = JWTUtils.extractTokenFromHeader(authHeader);
+    let token = JWTUtils.extractTokenFromHeader(authHeader);
+
+    // If no auth header, try to get from cookies (for web sessions)
+    if (!token && req.cookies && req.cookies.authToken) {
+      token = req.cookies.authToken;
+    }
 
     if (!token) {
       // No token provided, continue without authentication

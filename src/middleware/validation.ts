@@ -206,34 +206,6 @@ export const validateProfileUpdate: ValidationChain[] = [
     .trim()
 ];
 
-/**
- * Rate limiting validation - checks for suspicious request patterns
- */
-export const validateRateLimit = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
-  const userAgent = req.get('User-Agent') || '';
-  const ip = req.ip || req.connection.remoteAddress || '';
-
-  // Block requests with suspicious user agents
-  const suspiciousAgents = [
-    'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget'
-  ];
-
-  if (suspiciousAgents.some(agent => userAgent.toLowerCase().includes(agent))) {
-    res.status(429).json({
-      success: false,
-      message: 'Too many requests',
-      error: 'RATE_LIMIT_EXCEEDED',
-      timestamp: new Date().toISOString()
-    });
-    return;
-  }
-
-  next();
-};
 
 /**
  * Sanitization middleware to prevent XSS and injection attacks

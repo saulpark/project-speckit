@@ -132,7 +132,6 @@ async function testLoginEndpoint() {
     console.log('   - Express integration: ✅ Proper Express.js usage');
     console.log('   - Route middleware: ✅ Complete chain');
     console.log('     - sanitizeInput: ✅ XSS protection');
-    console.log('     - validateRateLimit: ✅ DoS protection');
     console.log('     - validateLogin: ✅ Input validation');
     console.log('     - handleValidationErrors: ✅ Error formatting');
     console.log('     - AuthController.login: ✅ Business logic');

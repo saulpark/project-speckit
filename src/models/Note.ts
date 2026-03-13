@@ -6,11 +6,18 @@ export interface INoteContent {
   preview?: string;
 }
 
+export interface ISharedUser {
+  userId: mongoose.Types.ObjectId;
+  grantedAt: Date;
+  grantedBy: mongoose.Types.ObjectId;
+}
+
 export interface INote extends Document {
   userId: mongoose.Types.ObjectId;
   title: string;
   content: INoteContent;
   isPublic: boolean;
+  sharedWith: ISharedUser[];
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
@@ -45,6 +52,24 @@ const noteSchema = new Schema<INote>(
       type: Boolean,
       default: false,
     },
+    sharedWith: [
+      {
+        userId: {
+          type: Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        grantedAt: {
+          type: Date,
+          default: Date.now,
+        },
+        grantedBy: {
+          type: Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+      },
+    ],
     tags: [
       {
         type: String,
@@ -61,5 +86,6 @@ const noteSchema = new Schema<INote>(
 noteSchema.index({ userId: 1, updatedAt: -1 });
 noteSchema.index({ userId: 1, title: 'text', 'content.preview': 'text' });
 noteSchema.index({ isPublic: 1, updatedAt: -1 });
+noteSchema.index({ 'sharedWith.userId': 1 });
 
 export const Note: INoteModel = mongoose.model<INote, INoteModel>('Note', noteSchema);

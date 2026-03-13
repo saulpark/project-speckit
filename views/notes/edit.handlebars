@@ -1,0 +1,197 @@
+<link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
+
+<div class="container" style="max-width: 800px; margin: 0 auto; padding: 2rem 1rem;">
+  <div style="margin-bottom: 1.5rem;">
+    <a href="{{#if note._id}}/notes/{{note._id}}{{else}}/notes{{/if}}" style="color: #4361ee; text-decoration: none; font-size: 0.875rem;">&larr; {{#if note._id}}Back to Note{{else}}Back to Notes{{/if}}</a>
+  </div>
+
+  <h1 style="margin: 0 0 1.5rem 0;">{{#if note._id}}Edit Note{{else}}New Note{{/if}}</h1>
+
+  <div id="saveStatus" style="margin-bottom: 1rem; font-size: 0.875rem; color: #718096; min-height: 1.25rem;"></div>
+
+  <form id="noteForm" method="POST" action="/notes{{#if note._id}}/{{note._id}}{{/if}}" style="display: flex; flex-direction: column; gap: 1.25rem;">
+    {{#if note._id}}
+      <input type="hidden" name="_method" value="PUT">
+    {{/if}}
+
+    <div>
+      <label for="title" style="display: block; font-weight: 500; margin-bottom: 0.375rem; color: #4a5568;">Title</label>
+      <input type="text" id="title" name="title" value="{{note.title}}" placeholder="Untitled"
+        style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 1rem; box-sizing: border-box;">
+    </div>
+
+    <div>
+      <label style="display: block; font-weight: 500; margin-bottom: 0.375rem; color: #4a5568;">Content</label>
+      <div id="editor" style="height: 350px; border: 1px solid #e2e8f0; border-radius: 4px; background: white;"></div>
+      <input type="hidden" name="contentData" id="contentData">
+    </div>
+
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+      <button type="submit" style="padding: 0.5rem 1.25rem; background: #4361ee; color: white; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer;">
+        Save Note
+      </button>
+      <a href="{{#if note._id}}/notes/{{note._id}}{{else}}/notes{{/if}}" style="padding: 0.5rem 1.25rem; border: 1px solid #718096; color: #4a5568; text-decoration: none; border-radius: 4px; font-size: 1rem;">
+        Cancel
+      </a>
+      {{#if note._id}}
+        <button type="button" id="deleteBtn" style="margin-left: auto; padding: 0.5rem 1.25rem; border: 1px solid #e53e3e; color: #e53e3e; background: transparent; border-radius: 4px; font-size: 1rem; cursor: pointer;">
+          Delete
+        </button>
+      {{/if}}
+    </div>
+  </form>
+</div>
+
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script>
+(function() {
+  var quill = new Quill('#editor', {
+    theme: 'snow',
+    modules: {
+      toolbar: [
+        ['bold', 'italic', 'underline'],
+        ['blockquote', 'code-block'],
+        [{ 'header': 1 }, { 'header': 2 }],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        ['link', 'clean']
+      ]
+    }
+  });
+
+  // Load existing content if editing
+  {{#if note.content.data}}
+  try {
+    var existingContent = {{{json note.content.data}}};
+    if (existingContent && existingContent.ops) {
+      quill.setContents(existingContent);
+    }
+  } catch (e) {
+    console.warn('Could not load existing content:', e);
+  }
+  {{/if}}
+
+  // Handle form submission — serialize Delta to hidden input
+  document.getElementById('noteForm').addEventListener('submit', function(e) {
+    var delta = quill.getContents();
+    document.getElementById('contentData').value = JSON.stringify({
+      type: 'delta',
+      data: delta
+    });
+  });
+
+  // Override the form to send JSON for the API
+  document.getElementById('noteForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    var title = document.getElementById('title').value;
+    var delta = quill.getContents();
+    var noteId = document.querySelector('input[name="_method"]') ? '{{note._id}}' : null;
+
+    var body = {
+      title: title,
+      content: {
+        type: 'delta',
+        data: delta
+      }
+    };
+
+    var method = noteId ? 'PUT' : 'POST';
+    var url = noteId ? '/notes/' + noteId : '/notes';
+
+    fetch(url, {
+      method: method,
+      credentials: 'include', // Send cookies for authentication
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    })
+    .then(function(res) {
+      return res.json().then(function(data) {
+        return { status: res.status, data: data };
+      });
+    })
+    .then(function(result) {
+      if (result.data.success) {
+        var savedNote = result.data.data.note;
+        window.location.href = '/notes/' + savedNote._id;
+      } else {
+        showStatus('Save failed: ' + (result.data.message || 'Unknown error'), 'error');
+      }
+    })
+    .catch(function(err) {
+      showStatus('Save failed: ' + err.message, 'error');
+    });
+  });
+
+  // Auto-save for existing notes only
+  {{#if note._id}}
+  var saveTimeout;
+  quill.on('text-change', function() {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(autoSave, 2000);
+  });
+
+  function autoSave() {
+    var title = document.getElementById('title').value;
+    var delta = quill.getContents();
+
+    fetch('/notes/{{note._id}}', {
+      method: 'PUT',
+      credentials: 'include', // Send cookies for authentication
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title: title,
+        content: { type: 'delta', data: delta }
+      })
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.success) {
+        showStatus('Auto-saved', 'success');
+      }
+    })
+    .catch(function(err) {
+      console.error('Auto-save failed:', err);
+    });
+  }
+  {{/if}}
+
+  function showStatus(message, type) {
+    var el = document.getElementById('saveStatus');
+    el.textContent = message;
+    el.style.color = type === 'error' ? '#e53e3e' : '#48bb78';
+    setTimeout(function() { el.textContent = ''; }, 3000);
+  }
+
+  // Delete button handler
+  var deleteBtn = document.getElementById('deleteBtn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', function() {
+      if (!confirm('Are you sure you want to delete this note?')) return;
+
+      fetch('/notes/{{note._id}}', {
+        method: 'DELETE',
+        credentials: 'include', // Send cookies for authentication
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(function(res) {
+        if (res.ok) {
+          window.location.href = '/notes';
+        } else {
+          return res.json().then(function(data) {
+            alert('Delete failed: ' + (data.message || 'Unknown error'));
+          });
+        }
+      })
+      .catch(function(err) {
+        alert('Delete failed: ' + err.message);
+      });
+    });
+  }
+})();
+</script>

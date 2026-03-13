@@ -1,0 +1,46 @@
+{{!-- Alert/Flash Message Component --}}
+{{#if message}}
+<div class="alert alert-{{type}}" role="alert">
+  {{#if dismissible}}
+  <button type="button" class="alert-close" onclick="this.parentElement.remove()" aria-label="Close">
+    &times;
+  </button>
+  {{/if}}
+
+  {{#if title}}
+  <strong>{{title}}:</strong>
+  {{/if}}
+
+  {{#if html}}
+  {{{message}}}
+  {{else}}
+  {{message}}
+  {{/if}}
+</div>
+
+<style>
+.alert-close {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+}
+
+.alert-close:hover {
+  opacity: 1;
+}
+
+.alert {
+  position: relative;
+  padding-right: var(--space-10);
+}
+</style>
+{{/if}}

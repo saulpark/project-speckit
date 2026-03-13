@@ -2,15 +2,16 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import { engine } from 'express-handlebars';
 import path from 'path';
 import { database } from './config/database';
 import authRoutes from './routes/authRoutes';
 import noteRoutes from './routes/noteRoutes';
+import { NoteController } from './controllers/noteController';
 import {
   CSRFProtection,
-  generalRateLimit,
   securityHeaders,
   securityLogger,
   IPBlacklist,
@@ -30,7 +31,6 @@ const PORT = process.env.PORT || 3000;
 
 // Apply security middlewares in order
 app.use(IPBlacklist.middleware()); // Block blacklisted IPs first
-app.use(generalRateLimit); // Apply general rate limiting
 app.use(requestSizeLimit()); // Limit request payload size
 app.use(helmet()); // Basic security headers
 app.use(securityHeaders()); // Additional security headers
@@ -51,6 +51,7 @@ app.use(CSRFProtection.addTokenMiddleware());
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Static file serving
 app.use('/static', express.static('public'));
@@ -73,7 +74,24 @@ app.engine('handlebars', engine({
     eq: (a: any, b: any) => a === b,
     ne: (a: any, b: any) => a !== b,
     json: (context: any) => JSON.stringify(context),
-    formatDate: (date: Date) => date.toLocaleDateString(),
+    formatDate: (date: any, options?: any) => {
+      // Ignore the options parameter that Handlebars passes
+      if (!date) return 'Unknown date';
+      if (typeof date === 'string') {
+        try {
+          const parsed = new Date(date);
+          if (isNaN(parsed.getTime())) return 'Invalid date';
+          return parsed.toLocaleDateString();
+        } catch (e) {
+          return 'Invalid date';
+        }
+      }
+      if (date instanceof Date) {
+        if (isNaN(date.getTime())) return 'Invalid date';
+        return date.toLocaleDateString();
+      }
+      return 'Invalid date';
+    },
     capitalize: (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
   }
 }));
@@ -84,7 +102,162 @@ app.set('views', path.join(__dirname, '../views'));
 // Authentication routes
 app.use('/auth', authRoutes);
 
-// Notes routes
+// Public note access (no authentication required, but rate limited)
+app.get('/public/notes/:id', NoteController.getPublicNote);
+
+// Test registration form
+app.get('/test-register', (req: Request, res: Response) => {
+  res.send(`
+    <h2>Registration Test</h2>
+    <form id="testForm">
+      <div style="margin: 10px 0;">
+        <label>Email:</label><br>
+        <input type="email" id="email" placeholder="test@example.com" style="width: 300px; padding: 8px;" required>
+      </div>
+      <div style="margin: 10px 0;">
+        <label>Password:</label><br>
+        <input type="password" id="password" placeholder="Password123!" style="width: 300px; padding: 8px;" required>
+      </div>
+      <button type="submit" style="padding: 10px 20px; background: #4361ee; color: white; border: none; border-radius: 4px;">Test Registration</button>
+    </form>
+    <div id="result" style="margin-top: 20px; padding: 10px; border-radius: 4px;"></div>
+
+    <script>
+      document.getElementById('testForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const resultDiv = document.getElementById('result');
+
+        try {
+          const response = await fetch('/test-register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            resultDiv.innerHTML = '✅ Registration successful! User created: ' + data.user.email;
+            resultDiv.style.background = '#c6f6d5';
+            resultDiv.style.color = '#22543d';
+          } else {
+            resultDiv.innerHTML = '❌ Registration failed: ' + data.message + ' (Error: ' + data.error + ')';
+            resultDiv.style.background = '#fed7d7';
+            resultDiv.style.color = '#e53e3e';
+          }
+        } catch (error) {
+          resultDiv.innerHTML = '❌ Network error: ' + error.message;
+          resultDiv.style.background = '#fed7d7';
+          resultDiv.style.color = '#e53e3e';
+        }
+      });
+    </script>
+  `);
+});
+
+// Test UI route (no auth required)
+app.get('/test-ui', (req: Request, res: Response) => {
+  res.render('notes/list', {
+    pageTitle: 'UI Test - Notes Interface',
+    notes: [
+      {
+        _id: 'test1',
+        title: '✅ UI Test - Notes Interface Working!',
+        content: { preview: 'If you can see this styled note card, the template system and CSS are working correctly.' },
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        isPublic: true,
+        sharedWith: []
+      },
+      {
+        _id: 'test2',
+        title: '🔗 Test Public Note',
+        content: { preview: 'This note has sharing enabled - you should see sharing indicators.' },
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        isPublic: true,
+        sharedWith: [{userId: 'user1', grantedAt: new Date()}]
+      },
+      {
+        _id: 'test3',
+        title: '👥 Test Shared Note',
+        content: { preview: 'This note is shared with users - check the sharing badges.' },
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        isPublic: false,
+        sharedWith: [
+          {userId: 'user1', grantedAt: new Date()},
+          {userId: 'user2', grantedAt: new Date()}
+        ]
+      }
+    ],
+    pagination: { page: 1, limit: 20, total: 3, pages: 1 },
+    isSharedView: false,
+    user: { id: 'test', email: 'test@example.com' }
+  });
+});
+
+// Test shared notes UI (no auth required)
+app.get('/test-shared', (req: Request, res: Response) => {
+  res.render('notes/list', {
+    pageTitle: 'UI Test - Shared Notes',
+    notes: [
+      {
+        _id: 'shared1',
+        title: '📤 Note Shared With You',
+        content: { preview: 'This is how shared notes appear in your shared notes list.' },
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        owner: { email: 'john@example.com' },
+        isPublic: false,
+        sharedWith: []
+      }
+    ],
+    pagination: { page: 1, limit: 20, total: 1, pages: 1 },
+    isSharedView: true,
+    user: { id: 'test', email: 'test@example.com' }
+  });
+});
+
+// Test registration endpoint
+app.post('/test-register', express.json(), async (req: Request, res: Response) => {
+  try {
+    console.log('Test registration attempt:', req.body);
+
+    // Basic validation
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required',
+        error: 'MISSING_FIELDS'
+      });
+    }
+
+    // Try to create user
+    const { AuthService } = await import('./services/authService');
+    const user = await AuthService.registerUser({ email, password });
+
+    res.json({
+      success: true,
+      message: 'User created successfully!',
+      user: user
+    });
+
+  } catch (error: any) {
+    console.error('Registration test error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Registration failed',
+      error: error.code || 'REGISTRATION_ERROR'
+    });
+  }
+});
+
+// Notes routes (authentication required)
 app.use('/notes', noteRoutes);
 
 // Enhanced health check endpoint
