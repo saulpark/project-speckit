@@ -24,7 +24,20 @@ export const verifyNoteOwnership = async (
       return;
     }
 
+    console.log('🔍 verifyNoteOwnership debug:', {
+      requestedNoteId: req.params.id,
+      userId: user.id,
+      path: req.path
+    });
+
     const note = await Note.findById(req.params.id);
+
+    console.log('📝 Note lookup result:', {
+      noteFound: !!note,
+      noteUserId: note?.userId?.toString(),
+      requestingUserId: user.id.toString(),
+      ownershipMatch: note ? note.userId.toString() === user.id.toString() : false
+    });
 
     // Return 404 for missing note OR wrong owner (no information leakage)
     if (!note || note.userId.toString() !== user.id.toString()) {
