@@ -125,7 +125,7 @@ async function testRegistrationEndpoint() {
 
     // Verify route middleware chain
     const routeMiddlewares = [
-      'sanitizeInput', 'validateRateLimit', 'validateRegistration',
+      'sanitizeInput', 'validateRegistration',
       'handleValidationErrors', 'AuthController.register'
     ];
 

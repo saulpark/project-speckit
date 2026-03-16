@@ -1,0 +1,148 @@
+<div class="auth-container">
+  <div class="auth-card card">
+    <!-- Header -->
+    <div class="auth-header">
+      <div class="auth-logo">SpecKit</div>
+      <h1 class="auth-title">Sign In</h1>
+      <p class="auth-subtitle">Welcome back! Please sign in to your account</p>
+    </div>
+
+    <!-- Alert Container for Messages -->
+    <div id="alertContainer"></div>
+
+    <!-- Login Form -->
+    <form id="loginForm" class="auth-form" novalidate>
+      <!-- Email Field -->
+      <div class="form-group">
+        <label for="email" class="form-label">Email Address</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          class="form-control"
+          placeholder="Enter your email address"
+          autocomplete="email"
+          required
+        >
+      </div>
+
+      <!-- Password Field -->
+      <div class="form-group">
+        <label for="password" class="form-label">Password</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          class="form-control"
+          placeholder="Enter your password"
+          autocomplete="current-password"
+          required
+        >
+      </div>
+
+      <!-- Remember Me & Forgot Password -->
+      <div class="form-group" style="display: flex; justify-content: space-between; align-items: center;">
+        <label class="form-check">
+          <input type="checkbox" id="rememberMe" name="rememberMe" class="form-check-input">
+          <span class="form-check-label">Remember me</span>
+        </label>
+        <a href="/auth/forgot-password" class="text-primary">Forgot password?</a>
+      </div>
+
+      <!-- Submit Button -->
+      <button type="submit" class="btn btn-primary btn-block">
+        Sign In
+      </button>
+    </form>
+
+    <!-- Divider -->
+    <div class="auth-divider">
+      <span>or</span>
+    </div>
+
+    <!-- Register Link -->
+    <div class="text-center">
+      <p class="mb-0">
+        Don't have an account?
+        <a href="/auth/register" class="text-primary">Create account</a>
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Page-specific styles -->
+<style>
+.auth-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.form-check {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.form-check-input {
+  margin-right: var(--space-2);
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--primary);
+}
+
+.form-check-label {
+  user-select: none;
+}
+
+.auth-form .form-group:last-of-type {
+  margin-bottom: var(--space-6);
+}
+
+.btn-block {
+  width: 100%;
+  padding: var(--space-4) var(--space-6);
+  font-weight: 600;
+  font-size: 1rem;
+}
+</style>
+
+<!-- Page-specific JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Focus on email field
+  document.getElementById('email').focus();
+
+  // Enhanced form validation feedback
+  const emailField = document.getElementById('email');
+  const passwordField = document.getElementById('password');
+
+  // Real-time email validation (basic format check only)
+  emailField.addEventListener('blur', function() {
+    if (this.value && !SpecKit.utils.isValidEmail(this.value)) {
+      this.classList.add('is-invalid');
+    } else {
+      this.classList.remove('is-invalid');
+    }
+  });
+
+  // Clear validation on focus
+  [emailField, passwordField].forEach(field => {
+    field.addEventListener('focus', function() {
+      this.classList.remove('is-invalid');
+      // Clear any previous alerts
+      const alerts = document.querySelectorAll('.alert');
+      alerts.forEach(alert => alert.remove());
+    });
+  });
+
+  // Handle Enter key in password field
+  passwordField.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      document.getElementById('loginForm').dispatchEvent(new Event('submit'));
+    }
+  });
+
+  console.log('Login form initialized');
+});
+</script>

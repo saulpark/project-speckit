@@ -13,9 +13,9 @@ services:
       - BCRYPT_ROUNDS=12
     depends_on:
       - mongo
-    volumes:
-      - .:/app
-      - /app/node_modules
+    # volumes:
+      # - .:/app  # TEMPORARILY DISABLED - volume mount overrides built files
+      # - /app/node_modules
     networks:
       - app-network
 

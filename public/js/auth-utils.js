@@ -247,11 +247,13 @@ document.addEventListener('DOMContentLoaded', () => {
     SpecKit.authUtils.createPasswordStrengthIndicator(field);
   });
 
-  // Setup email availability checking
-  const emailFields = document.querySelectorAll('input[type="email"]');
-  emailFields.forEach(field => {
-    SpecKit.authUtils.setupEmailChecker(field);
-  });
+  // Setup email availability checking only on registration pages
+  if (window.location.pathname.includes('/register') || window.location.pathname.includes('/signup')) {
+    const emailFields = document.querySelectorAll('input[type="email"]');
+    emailFields.forEach(field => {
+      SpecKit.authUtils.setupEmailChecker(field);
+    });
+  }
 
   // Setup bot prevention
   const forms = document.querySelectorAll('form[id*="Form"]');

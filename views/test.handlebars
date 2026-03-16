@@ -1,0 +1,52 @@
+<div class="container-xs">
+  <div class="card">
+    <div class="card-header">
+      <h1 class="auth-title">Template Engine Test</h1>
+      <p class="auth-subtitle">Testing Handlebars template rendering</p>
+    </div>
+
+    <div class="card-body">
+      <h3>Template Variables</h3>
+      <ul>
+        <li><strong>Page Title:</strong> {{pageTitle}}</li>
+        <li><strong>Current Time:</strong> {{currentTime}}</li>
+        <li><strong>Environment:</strong> {{environment}}</li>
+        <li><strong>Version:</strong> {{version}}</li>
+      </ul>
+
+      <h3>Helper Functions</h3>
+      <ul>
+        <li><strong>Capitalized Text:</strong> {{capitalize "test string"}}</li>
+        <li><strong>Date Formatting:</strong> {{formatDate testDate}}</li>
+        <li><strong>Equality Test:</strong> {{eq environment "development"}}</li>
+      </ul>
+
+      <h3>Conditional Rendering</h3>
+      {{#if showMessage}}
+      <div class="alert alert-success">
+        This message is shown because showMessage is true!
+      </div>
+      {{else}}
+      <div class="alert alert-info">
+        showMessage is false, so this fallback is shown.
+      </div>
+      {{/if}}
+
+      <h3>Loop Rendering</h3>
+      {{#if testItems}}
+      <ul>
+        {{#each testItems}}
+        <li>{{@index}}: {{this}}</li>
+        {{/each}}
+      </ul>
+      {{else}}
+      <p class="text-muted">No test items provided</p>
+      {{/if}}
+    </div>
+
+    <div class="card-footer">
+      <a href="/" class="btn btn-primary">Back to Home</a>
+      <a href="/auth/login" class="btn btn-outline-primary">Login</a>
+    </div>
+  </div>
+</div>

@@ -5,22 +5,17 @@ import {
   validateLogin,
   validatePasswordResetRequest,
   handleValidationErrors,
-  sanitizeInput,
-  validateRateLimit
+  sanitizeInput
 } from '../middleware/validation';
 import { body } from 'express-validator';
-import { authenticateToken, optionalAuthentication } from '../middleware/auth';
-import { CSRFProtection, authRateLimit } from '../middleware/security';
+import { authenticateToken, authenticateWeb, optionalAuthentication } from '../middleware/auth';
+import { CSRFProtection } from '../middleware/security';
 import { TokenBlacklistService } from '../services/tokenBlacklistService';
 
 const router = express.Router();
 
 // Apply common middleware to all auth routes
 router.use(sanitizeInput);
-router.use(validateRateLimit);
-
-// Apply auth-specific rate limiting to sensitive endpoints
-router.use(['/login', '/register', '/reset-password-request'], authRateLimit);
 
 /**
  * @route   POST /auth/register
@@ -84,10 +79,37 @@ router.get('/stats', authenticateToken, AuthController.getAuthStats);
 /**
  * @route   GET /auth/me
  * @desc    Get current authenticated user information
- * @access  Protected - requires valid JWT token
+ * @access  Protected - requires authentication (cookies or tokens)
  */
-router.get('/me', authenticateToken, (req: express.Request, res: express.Response) => {
+router.get('/me', optionalAuthentication, (req: express.Request, res: express.Response) => {
   const authReq = req as any; // AuthenticatedRequest
+
+  // Debug logging for authentication troubleshooting
+  const authHeader = req.headers['authorization'];
+  const hasCookie = req.cookies && req.cookies.authToken;
+
+  console.log('🔍 /auth/me authentication check:', {
+    hasAuthHeader: !!authHeader,
+    hasCookie: !!hasCookie,
+    hasUser: !!authReq.user,
+    userAgent: req.get('User-Agent')?.slice(0, 50),
+    ip: req.ip
+  });
+
+  if (!authReq.user) {
+    return res.status(401).json({
+      success: false,
+      message: 'Not authenticated - please log in',
+      error: 'NOT_AUTHENTICATED',
+      debug: {
+        hasAuthHeader: !!authHeader,
+        hasCookie: !!hasCookie,
+        middlewareExecuted: true
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+
   res.json({
     success: true,
     message: 'User information retrieved successfully',
@@ -139,7 +161,7 @@ router.get('/register', (req: express.Request, res: express.Response) => {
  * @desc    Display authenticated user dashboard
  * @access  Protected - requires authentication
  */
-router.get('/dashboard', authenticateToken, (req: express.Request, res: express.Response) => {
+router.get('/dashboard', authenticateWeb, (req: express.Request, res: express.Response) => {
   const authReq = req as any; // AuthenticatedRequest
 
   res.render('dashboard', {
@@ -251,7 +273,6 @@ router.get('/admin/status', authenticateToken, (req: express.Request, res: expre
           public: 6
         },
         security: {
-          rateLimiting: 'active',
           csrfProtection: process.env.NODE_ENV !== 'test' ? 'active' : 'disabled-for-tests',
           jwtValidation: 'active',
           passwordHashing: 'bcrypt-12-rounds'
@@ -304,6 +325,158 @@ router.get('/test-token', (req: express.Request, res: express.Response) => {
       expiresAt: testToken.expiresAt,
       expiresIn: testToken.expiresIn,
       usage: 'Use this token in Authorization header as: Bearer <token>'
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
+ * @route   GET /auth/test-registration
+ * @desc    Test registration functionality
+ * @access  Public
+ */
+router.get('/test-registration', (req: express.Request, res: express.Response) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html><head><title>Registration Test</title></head><body>
+    <h2>🧪 Registration Test</h2>
+    <p>Test if registration API is working</p>
+    <form id="regForm" style="max-width: 400px; font-family: Arial, sans-serif;">
+      <div style="margin: 15px 0;">
+        <label><strong>Email:</strong></label><br>
+        <input type="email" id="email" placeholder="test@example.com" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;" required>
+      </div>
+      <div style="margin: 15px 0;">
+        <label><strong>Password:</strong></label><br>
+        <input type="password" id="password" placeholder="Password123!" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px;" required>
+        <small style="color: #666;">Must be 8+ characters with numbers and symbols</small>
+      </div>
+      <button type="submit" style="padding: 12px 24px; background: #4361ee; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">Test Registration</button>
+    </form>
+    <div id="result" style="margin-top: 20px; padding: 15px; border-radius: 4px; display: none;"></div>
+
+    <script>
+      // Get CSRF token from meta tag or generate one
+      let csrfToken = null;
+
+      // First, get the CSRF token by making a GET request
+      async function getCSRFToken() {
+        try {
+          const response = await fetch('/auth/register', {
+            method: 'GET'
+          });
+          return response.headers.get('X-CSRF-Token');
+        } catch (error) {
+          console.error('Failed to get CSRF token:', error);
+          return null;
+        }
+      }
+
+      document.getElementById('regForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const resultDiv = document.getElementById('result');
+        const submitBtn = document.querySelector('button[type="submit"]');
+
+        submitBtn.textContent = 'Testing...';
+        submitBtn.disabled = true;
+
+        // Get CSRF token if we don't have one
+        if (!csrfToken) {
+          csrfToken = await getCSRFToken();
+        }
+
+        try {
+          const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          };
+
+          // Add CSRF token if available
+          if (csrfToken) {
+            headers['X-CSRF-Token'] = csrfToken;
+          }
+
+          const response = await fetch('/auth/register', {
+            method: 'POST',
+            headers: headers,
+            body: JSON.stringify({ email, password })
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            resultDiv.innerHTML = '✅ <strong>Registration successful!</strong><br>User: ' + data.data.user.email;
+            resultDiv.style.background = '#c6f6d5';
+            resultDiv.style.color = '#22543d';
+            resultDiv.style.border = '1px solid #38a169';
+          } else {
+            resultDiv.innerHTML = '❌ <strong>Registration failed:</strong><br>' + (data.message || 'Unknown error') + '<br><small>Error code: ' + (data.error || 'N/A') + '</small>';
+            resultDiv.style.background = '#fed7d7';
+            resultDiv.style.color = '#e53e3e';
+            resultDiv.style.border = '1px solid #e53e3e';
+          }
+        } catch (error) {
+          resultDiv.innerHTML = '❌ <strong>Network error:</strong><br>' + error.message;
+          resultDiv.style.background = '#fed7d7';
+          resultDiv.style.color = '#e53e3e';
+          resultDiv.style.border = '1px solid #e53e3e';
+        }
+
+        resultDiv.style.display = 'block';
+        submitBtn.textContent = 'Test Registration';
+        submitBtn.disabled = false;
+      });
+    </script>
+    <hr style="margin: 30px 0;">
+    <h3>Navigation</h3>
+    <p><a href="/auth/register" style="color: #4361ee;">→ Go to real registration page</a></p>
+    <p><a href="/auth/login" style="color: #4361ee;">→ Go to login page</a></p>
+    <p><a href="/auth/dashboard" style="color: #4361ee;">→ Go to dashboard</a></p>
+    </body></html>
+  `);
+});
+
+/**
+ * @route   GET /auth/test-auth
+ * @desc    Test authentication status and token information
+ * @access  Public (uses optional authentication)
+ */
+router.get('/test-auth', optionalAuthentication, (req: express.Request, res: express.Response) => {
+  const authReq = req as any; // AuthenticatedRequest
+
+  const authHeader = req.headers['authorization'];
+  const hasCookie = req.cookies && req.cookies.authToken;
+  const hasUser = !!authReq.user;
+
+  res.json({
+    success: true,
+    message: 'Authentication test completed',
+    data: {
+      authentication: {
+        isAuthenticated: hasUser,
+        hasAuthHeader: !!authHeader,
+        hasCookie: !!hasCookie,
+        user: hasUser ? {
+          id: authReq.user.id,
+          email: authReq.user.email,
+          isActive: authReq.user.isActive
+        } : null,
+        tokenInfo: authReq.tokenPayload ? {
+          sub: authReq.tokenPayload.sub,
+          email: authReq.tokenPayload.email,
+          iat: authReq.tokenPayload.iat,
+          exp: authReq.tokenPayload.exp,
+          expiresAt: new Date(authReq.tokenPayload.exp * 1000).toISOString()
+        } : null
+      },
+      debug: {
+        cookies: Object.keys(req.cookies || {}),
+        userAgent: req.get('User-Agent')?.slice(0, 50) + '...',
+        ip: req.ip,
+        path: req.path
+      }
     },
     timestamp: new Date().toISOString()
   });

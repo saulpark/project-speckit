@@ -3,8 +3,7 @@ import {
   validateRegistration,
   validateLogin,
   handleValidationErrors,
-  sanitizeInput,
-  validateRateLimit
+  sanitizeInput
 } from '../middleware/validation';
 import dotenv from 'dotenv';
 

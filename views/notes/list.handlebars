@@ -1,0 +1,284 @@
+<!-- Notes CSS -->
+<link rel="stylesheet" href="/css/notes.css">
+
+<div class="container" style="max-width: 1100px; margin: 0 auto; padding: 2rem 1rem;">
+  <!-- Navigation Tabs -->
+  <div style="margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <a href="/notes" style="padding: 0.5rem 1rem; text-decoration: none; border-radius: 6px; font-weight: 500; {{#unless isSharedView}}background: #4361ee; color: white;{{else}}color: #4361ee; border: 1px solid #e2e8f0;{{/unless}}">
+          📝 My Notes
+        </a>
+        <a href="/notes/shared-with-me" style="padding: 0.5rem 1rem; text-decoration: none; border-radius: 6px; font-weight: 500; {{#if isSharedView}}background: #4361ee; color: white;{{else}}color: #4361ee; border: 1px solid #e2e8f0;{{/if}}">
+          📤 Shared with me
+        </a>
+      </div>
+      <a href="/notes/new" class="btn btn-primary" style="display: inline-block; padding: 0.5rem 1rem; background: var(--primary, #4361ee); color: white; text-decoration: none; border-radius: 4px;">
+        + New Note
+      </a>
+    </div>
+    <h1 style="margin: 0;">{{#if isSharedView}}Shared with me{{else}}My Notes{{/if}}</h1>
+  </div>
+
+  {{#if search}}
+    <div style="margin-bottom: 1rem;">
+      <small style="color: #666;">Search results for "{{search}}"</small>
+    </div>
+  {{/if}}
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;">
+    {{#each notes}}
+      <div class="card" style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: border-color 0.2s, transform 0.1s;" onclick="window.location.href='/notes/{{this._id}}/view'" onmouseover="this.style.borderColor='#4361ee'; this.style.transform='translateY(-1px)'" onmouseout="this.style.borderColor='#e2e8f0'; this.style.transform='translateY(0)'">
+        <div style="padding: 1.25rem; flex: 1;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+            <h5 style="margin: 0; font-size: 1.1rem; color: #1a202c;">{{this.title}}</h5>
+            <div style="display: flex; gap: 0.25rem; flex-wrap: wrap;">
+              {{#if this.isPublic}}
+              <span style="padding: 0.125rem 0.375rem; background: #c6f6d5; color: #22543d; border-radius: 4px; font-size: 0.625rem; font-weight: 500;">🌐 Public</span>
+              {{/if}}
+              {{#if this.sharedWith}}
+              {{#if this.sharedWith.length}}
+              <span style="padding: 0.125rem 0.375rem; background: #bee3f8; color: #2b6cb0; border-radius: 4px; font-size: 0.625rem; font-weight: 500;">👥 {{this.sharedWith.length}}</span>
+              {{/if}}
+              {{/if}}
+              {{#if this.owner}}
+              <span style="padding: 0.125rem 0.375rem; background: #fbb6ce; color: #97266d; border-radius: 4px; font-size: 0.625rem; font-weight: 500;">📤 Shared</span>
+              {{/if}}
+            </div>
+          </div>
+          <p style="margin: 0 0 0.75rem 0; color: #718096; font-size: 0.875rem; line-height: 1.5;">{{this.content.preview}}</p>
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <small style="color: #a0aec0; font-size: 0.75rem;">Updated {{formatDate this.updatedAt}}</small>
+            {{#if this.owner}}
+            <small style="color: #718096; font-size: 0.75rem;">by {{this.owner.email}}</small>
+            {{/if}}
+          </div>
+        </div>
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid #e2e8f0; display: flex; gap: 0.5rem;" onclick="event.stopPropagation();">
+          <a href="/notes/{{this._id}}/view" style="padding: 0.25rem 0.75rem; border: 1px solid #4361ee; color: #4361ee; text-decoration: none; border-radius: 4px; font-size: 0.875rem;">View</a>
+          <a href="/notes/{{this._id}}/edit" style="padding: 0.25rem 0.75rem; border: 1px solid #718096; color: #718096; text-decoration: none; border-radius: 4px; font-size: 0.875rem;">Edit</a>
+        </div>
+      </div>
+    {{else}}
+      <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 0;">
+        <div style="font-size: 3rem; margin-bottom: 1rem; color: #a0aec0;">&#128221;</div>
+        <h3 style="color: #4a5568;">No notes yet</h3>
+        <p style="color: #718096;">Create your first note to get started</p>
+        <a href="/notes/new" style="display: inline-block; padding: 0.5rem 1.5rem; background: #4361ee; color: white; text-decoration: none; border-radius: 4px; margin-top: 0.5rem;">
+          Create Note
+        </a>
+      </div>
+    {{/each}}
+  </div>
+
+  {{#if pagination.pages}}
+    {{#if (ne pagination.pages 1)}}
+    <div style="display: flex; justify-content: center; gap: 0.5rem; margin-top: 2rem; flex-wrap: wrap;">
+      {{#if (ne pagination.page 1)}}
+        <a href="?page={{subtract pagination.page 1}}" style="padding: 0.375rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 4px; text-decoration: none; color: #4a5568;">Previous</a>
+      {{/if}}
+      <span style="padding: 0.375rem 0.75rem; color: #718096;">Page {{pagination.page}} of {{pagination.pages}}</span>
+      {{#if (ne pagination.page pagination.pages)}}
+        <a href="?page={{add pagination.page 1}}" style="padding: 0.375rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 4px; text-decoration: none; color: #4a5568;">Next</a>
+      {{/if}}
+    </div>
+    {{/if}}
+  {{/if}}
+</div>
+
+<script>
+// Notes list enhancements
+document.addEventListener('DOMContentLoaded', function() {
+  // Add click handlers for quick note actions
+  initializeNoteCardInteractions();
+
+  // Auto-refresh shared notes count periodically
+  if (window.location.pathname.includes('shared-with-me')) {
+    setInterval(function() {
+      updateSharedNotesCount();
+    }, 300000); // Every 5 minutes
+  }
+});
+
+function initializeNoteCardInteractions() {
+  // Add hover effects for note cards
+  const noteCards = document.querySelectorAll('.card');
+
+  noteCards.forEach(function(card) {
+    // Add smooth hover transition
+    card.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
+
+    card.addEventListener('mouseenter', function() {
+      this.style.transform = 'translateY(-2px)';
+      this.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+    });
+
+    card.addEventListener('mouseleave', function() {
+      this.style.transform = 'translateY(0)';
+      this.style.boxShadow = 'none';
+    });
+  });
+}
+
+function updateSharedNotesCount() {
+  // Subtle update of shared notes indicators without full page reload
+  const token = localStorage.getItem('token');
+  const apiHeaders = {};
+  if (token) {
+    apiHeaders['Authorization'] = 'Bearer ' + token;
+  }
+
+  fetch('/notes/api/shared-with-me?limit=1', {
+    headers: apiHeaders,
+    credentials: 'include'
+  })
+  .then(function(res) {
+    if (res.ok) {
+      return res.json();
+    }
+  })
+  .then(function(data) {
+    if (data && data.data && data.data.pagination) {
+      // Update tab badge if total count changed
+      updateNavigationBadges(data.data.pagination.total);
+    }
+  })
+  .catch(function(err) {
+    console.debug('Background refresh failed:', err);
+  });
+}
+
+function updateNavigationBadges(sharedCount) {
+  const sharedTab = document.querySelector('a[href="/notes/shared-with-me"]');
+  if (sharedTab && sharedCount > 0) {
+    // Add a subtle badge if there are shared notes
+    if (!sharedTab.querySelector('.count-badge')) {
+      const badge = document.createElement('span');
+      badge.className = 'count-badge';
+      badge.style.cssText = 'margin-left: 0.25rem; padding: 0.125rem 0.375rem; background: #4361ee; color: white; border-radius: 10px; font-size: 0.75rem;';
+      badge.textContent = sharedCount;
+      sharedTab.appendChild(badge);
+    } else {
+      sharedTab.querySelector('.count-badge').textContent = sharedCount;
+    }
+  }
+}
+
+// Quick copy function for public links (if displayed in cards)
+function copyPublicLink(event, noteId) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  const publicUrl = window.location.origin + '/public/notes/' + noteId;
+
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(publicUrl).then(function() {
+      showTemporaryFeedback(event.target, 'Link copied!');
+    }).catch(function() {
+      fallbackCopyToClipboard(publicUrl);
+    });
+  } else {
+    fallbackCopyToClipboard(publicUrl);
+  }
+}
+
+function fallbackCopyToClipboard(text) {
+  const textArea = document.createElement('textarea');
+  textArea.value = text;
+  textArea.style.position = 'fixed';
+  textArea.style.left = '-999999px';
+  textArea.style.top = '-999999px';
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+
+  try {
+    document.execCommand('copy');
+    showGlobalFeedback('Link copied to clipboard!');
+  } catch (err) {
+    console.error('Fallback copy failed:', err);
+    showGlobalFeedback('Failed to copy link');
+  } finally {
+    document.body.removeChild(textArea);
+  }
+}
+
+function showTemporaryFeedback(element, message) {
+  const originalText = element.textContent;
+  element.textContent = message;
+  element.style.color = '#38a169';
+
+  setTimeout(function() {
+    element.textContent = originalText;
+    element.style.color = '';
+  }, 2000);
+}
+
+function showGlobalFeedback(message) {
+  // Create a temporary toast notification
+  const toast = document.createElement('div');
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #38a169;
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+  `;
+  toast.textContent = message;
+
+  document.body.appendChild(toast);
+
+  // Trigger animation
+  setTimeout(function() {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  }, 100);
+
+  // Remove after delay
+  setTimeout(function() {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-10px)';
+    setTimeout(function() {
+      if (toast.parentNode) {
+        document.body.removeChild(toast);
+      }
+    }, 300);
+  }, 3000);
+}
+
+// Enhanced keyboard navigation for note cards
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'Enter') {
+    const focusedElement = document.activeElement;
+    if (focusedElement && focusedElement.matches('.card a')) {
+      focusedElement.click();
+    }
+  }
+});
+
+// Search functionality enhancement (if search exists)
+const searchParam = new URLSearchParams(window.location.search).get('search');
+if (searchParam) {
+  // Highlight search terms in note titles and previews
+  highlightSearchTerms(searchParam);
+}
+
+function highlightSearchTerms(searchTerm) {
+  const elements = document.querySelectorAll('h5, p');
+  const regex = new RegExp('(' + searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+
+  elements.forEach(function(element) {
+    if (element.textContent.includes(searchTerm)) {
+      element.innerHTML = element.innerHTML.replace(regex, '<mark style="background: #fef08a; padding: 0.125rem;">$1</mark>');
+    }
+  });
+}
+</script>

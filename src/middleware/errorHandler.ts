@@ -52,11 +52,6 @@ export class ConflictError extends AppError {
   }
 }
 
-export class RateLimitError extends AppError {
-  constructor(message: string = 'Rate limit exceeded') {
-    super(message, 429, 'RATE_LIMIT_ERROR');
-  }
-}
 
 /**
  * Error Response Interface
@@ -208,7 +203,6 @@ export const ErrorMessages = {
   NETWORK_ERROR: 'Unable to connect to the server. Please check your internet connection and try again.',
   SERVER_ERROR: 'Something went wrong on our end. Please try again later.',
   VALIDATION_FAILED: 'Please check your input and try again.',
-  RATE_LIMIT_EXCEEDED: 'Too many requests. Please wait a moment before trying again.',
   CSRF_TOKEN_INVALID: 'Security token invalid. Please refresh the page and try again.',
 
   // File/Upload

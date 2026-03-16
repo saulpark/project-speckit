@@ -1,0 +1,470 @@
+<div class="container">
+  <!-- Header with user info and logout -->
+  <header class="dashboard-header">
+    <div class="header-content">
+      <h1 class="dashboard-title">SpecKit Dashboard</h1>
+      <div class="user-menu">
+        <span class="user-greeting">Welcome, <strong data-user-name>User</strong></span>
+        <button class="btn btn-outline-primary" data-logout data-confirm="true">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Dashboard Content -->
+  <main class="dashboard-main">
+    <div class="row">
+      <!-- Authentication Status Card -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="mb-0">Authentication Status</h3>
+          </div>
+          <div class="card-body">
+            <div class="auth-info">
+              <div class="info-item">
+                <strong>Status:</strong>
+                <span class="badge badge-success" data-auth="true">Authenticated</span>
+                <span class="badge badge-secondary" data-auth="false">Not Authenticated</span>
+              </div>
+              <div class="info-item">
+                <strong>Email:</strong>
+                <span data-user-email>Loading...</span>
+              </div>
+              <div class="info-item">
+                <strong>Session:</strong>
+                <span id="sessionStatus">Active</span>
+              </div>
+              <div class="info-item">
+                <strong>Last Login:</strong>
+                <span id="lastLogin">Just now</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions Card -->
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="mb-0">Quick Actions</h3>
+          </div>
+          <div class="card-body">
+            <div class="action-buttons">
+              <a href="/notes" class="btn btn-primary btn-block mb-3" style="display: block; text-align: center; text-decoration: none;">
+                📝 My Notes
+              </a>
+              <a href="/notes/shared-with-me" class="btn btn-outline-primary btn-block mb-3" style="display: block; text-align: center; text-decoration: none;">
+                📤 Shared with me
+              </a>
+              <button class="btn btn-secondary btn-block mb-3" onclick="SpecKit.dashboard.testAPI()">
+                Test API Connection
+              </button>
+              <button class="btn btn-info btn-block mb-3" onclick="SpecKit.dashboard.refreshUserData()">
+                Refresh User Data
+              </button>
+              <button class="btn btn-info btn-block mb-3" onclick="SpecKit.dashboard.checkTokenStatus()">
+                Check Token Status
+              </button>
+              <a href="/auth/stats" class="btn btn-outline-info btn-block">
+                View Auth Statistics
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- System Information -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="mb-0">System Information</h3>
+          </div>
+          <div class="card-body">
+            <div class="system-info">
+              <div class="row">
+                <div class="col-md-3">
+                  <div class="info-box">
+                    <div class="info-label">Environment</div>
+                    <div class="info-value">{{environment}}</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="info-box">
+                    <div class="info-label">Version</div>
+                    <div class="info-value">{{version}}</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="info-box">
+                    <div class="info-label">Current Time</div>
+                    <div class="info-value" id="currentTime">{{currentTime}}</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="info-box">
+                    <div class="info-label">Uptime</div>
+                    <div class="info-value" id="uptime">{{uptime}}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="mb-0">Recent Activity</h3>
+          </div>
+          <div class="card-body">
+            <div id="activityLog" class="activity-log">
+              <div class="activity-item">
+                <span class="activity-time">{{currentTime}}</span>
+                <span class="activity-action">User logged in successfully</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Page-specific styles -->
+<style>
+.dashboard-header {
+  padding: var(--space-6) 0;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: var(--space-6);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dashboard-title {
+  color: var(--primary);
+  margin: 0;
+  font-size: 2rem;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.user-greeting {
+  color: var(--gray-700);
+}
+
+.row {
+  display: flex;
+  margin: 0 -var(--space-3);
+}
+
+.col-md-6 {
+  flex: 0 0 50%;
+  max-width: 50%;
+  padding: 0 var(--space-3);
+}
+
+.col-md-3 {
+  flex: 0 0 25%;
+  max-width: 25%;
+  padding: 0 var(--space-3);
+}
+
+.col-12 {
+  flex: 0 0 100%;
+  max-width: 100%;
+  padding: 0 var(--space-3);
+}
+
+.auth-info .info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.auth-info .info-item:last-child {
+  border-bottom: none;
+}
+
+.badge {
+  padding: var(--space-1) var(--space-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius);
+  text-transform: uppercase;
+}
+
+.badge-success {
+  background-color: var(--success);
+  color: white;
+}
+
+.badge-secondary {
+  background-color: var(--gray-500);
+  color: white;
+}
+
+.action-buttons .btn {
+  transition: all 0.2s ease;
+}
+
+.action-buttons .btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg);
+}
+
+.info-box {
+  text-align: center;
+  padding: var(--space-4);
+  background: var(--gray-50);
+  border-radius: var(--radius);
+  border: 1px solid var(--gray-200);
+}
+
+.info-label {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin-bottom: var(--space-2);
+  font-weight: 500;
+}
+
+.info-value {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.activity-log {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 0.875rem;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-time {
+  color: var(--gray-500);
+  font-family: var(--font-mono);
+}
+
+.activity-action {
+  color: var(--gray-700);
+}
+
+.mt-4 {
+  margin-top: var(--space-8);
+}
+
+/* Hide elements based on auth state */
+[data-auth="true"] {
+  display: block;
+}
+
+[data-auth="false"] {
+  display: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  .dashboard-title {
+    font-size: 1.5rem;
+  }
+
+  .col-md-6, .col-md-3 {
+    flex: 0 0 100%;
+    max-width: 100%;
+    margin-bottom: var(--space-4);
+  }
+
+  .row {
+    flex-direction: column;
+  }
+}
+</style>
+
+<!-- Dashboard JavaScript -->
+<script>
+// Dashboard functionality
+window.SpecKit = window.SpecKit || {};
+
+SpecKit.dashboard = {
+  async testAPI() {
+    SpecKit.utils.showAlert('Testing API connection...', 'info');
+
+    try {
+      const response = await SpecKit.auth.apiRequest('/me');
+      if (response.success) {
+        SpecKit.utils.showAlert('API connection successful!', 'success');
+        this.addActivity('API connection test passed');
+      } else {
+        SpecKit.utils.showAlert('API test failed: ' + response.message, 'error');
+      }
+    } catch (error) {
+      SpecKit.utils.showAlert('API test error: ' + error.message, 'error');
+    }
+  },
+
+  async refreshUserData() {
+    try {
+      // Use cookie-based authentication check instead of token verification
+      const response = await fetch('/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include cookies
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        SpecKit.auth.currentUser = data.data.user;
+        SpecKit.auth.updateUIForAuthentication(data.data.user);
+        SpecKit.utils.showAlert('User data refreshed successfully', 'success');
+        this.addActivity('User data refreshed');
+      } else {
+        SpecKit.utils.showAlert('Authentication verification failed', 'error');
+      }
+    } catch (error) {
+      SpecKit.utils.showAlert('Refresh failed: ' + error.message, 'error');
+    }
+  },
+
+  async checkTokenStatus() {
+    try {
+      // Check authentication status via API call
+      const response = await fetch('/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include cookies
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const tokenPayload = data.data.tokenPayload;
+
+        if (tokenPayload && tokenPayload.exp) {
+          const expiration = new Date(tokenPayload.exp * 1000);
+          const timeRemaining = expiration.getTime() - Date.now();
+          const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+          const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+
+          if (timeRemaining > 0) {
+            SpecKit.utils.showAlert(`Session expires in ${hours}h ${minutes}m`, 'info');
+          } else {
+            SpecKit.utils.showAlert('Session has expired', 'warning');
+          }
+        } else {
+          SpecKit.utils.showAlert('Session is valid (cookie-based authentication)', 'info');
+        }
+      } else {
+        SpecKit.utils.showAlert('Not authenticated - please log in', 'warning');
+      }
+    } catch (error) {
+      SpecKit.utils.showAlert('Status check error: ' + error.message, 'error');
+    }
+  },
+
+  addActivity(action) {
+    const activityLog = document.getElementById('activityLog');
+    if (activityLog) {
+      const activityItem = document.createElement('div');
+      activityItem.className = 'activity-item';
+      activityItem.innerHTML = `
+        <span class="activity-time">${new Date().toLocaleTimeString()}</span>
+        <span class="activity-action">${action}</span>
+      `;
+      activityLog.insertBefore(activityItem, activityLog.firstChild);
+
+      // Limit to 10 items
+      while (activityLog.children.length > 10) {
+        activityLog.removeChild(activityLog.lastChild);
+      }
+    }
+  },
+
+  updateTime() {
+    const timeElement = document.getElementById('currentTime');
+    if (timeElement) {
+      timeElement.textContent = new Date().toLocaleString();
+    }
+  }
+};
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+  // Update time every second
+  setInterval(SpecKit.dashboard.updateTime, 1000);
+
+  // Check authentication via API (uses cookies) instead of localStorage
+  async function checkAuthentication() {
+    try {
+      const response = await fetch('/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include cookies
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Cookie-based authentication successful:', data.data.user.email);
+
+        // Update local auth state for other scripts
+        SpecKit.auth.currentUser = data.data.user;
+        SpecKit.auth.token = 'cookie-based'; // Placeholder since we use cookies
+
+        SpecKit.dashboard.addActivity('Dashboard loaded');
+        return true;
+      } else {
+        console.log('Cookie-based authentication failed, redirecting to login');
+        setTimeout(() => {
+          window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
+        }, 2000);
+        return false;
+      }
+    } catch (error) {
+      console.error('Authentication check failed:', error);
+      setTimeout(() => {
+        window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
+      }, 2000);
+      return false;
+    }
+  }
+
+  // Run the authentication check
+  checkAuthentication();
+});
+</script>

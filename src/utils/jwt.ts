@@ -152,6 +152,12 @@ export class JWTUtils {
       return bearerMatch[1];
     }
 
+    // FIXED: Don't return malformed "Bearer" as a token
+    if (authHeader.trim() === 'Bearer') {
+      console.log('🚨 MALFORMED BEARER HEADER DETECTED - ignoring and falling back to cookies');
+      return null;
+    }
+
     // Handle token without Bearer prefix (fallback)
     if (authHeader.split(' ').length === 1) {
       return authHeader;

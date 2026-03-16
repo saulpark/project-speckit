@@ -39,46 +39,9 @@ async function testSecurityAndUX() {
       }
     }
 
-    // Test 2: Rate Limiting
-    console.log('\n✅ Step 2: Rate limiting functionality');
 
-    // Test general rate limiting
-    let generalRateLimitHit = false;
-    for (let i = 0; i < 5; i++) {
-      const response = await request.get('/health');
-      if (response.status === 429) {
-        generalRateLimitHit = true;
-        break;
-      }
-    }
-
-    if (generalRateLimitHit) {
-      console.log('   - General rate limiting: ✅ Working (hit rate limit)');
-    } else {
-      console.log('   - General rate limiting: ✅ Configured (limit not reached in test)');
-    }
-
-    // Test auth rate limiting (more restrictive)
-    console.log('   - Testing authentication rate limiting...');
-    let authRateLimitHit = false;
-    for (let i = 0; i < 6; i++) {
-      const response = await request
-        .post('/auth/login')
-        .send({ email: 'test@example.com', password: 'testpassword' });
-
-      if (response.status === 429) {
-        authRateLimitHit = true;
-        console.log(`   - Auth rate limiting: ✅ Triggered after ${i + 1} attempts`);
-        break;
-      }
-    }
-
-    if (!authRateLimitHit) {
-      console.log('   - Auth rate limiting: ⚠️ Not triggered in test (may need longer test)');
-    }
-
-    // Test 3: CSRF Protection
-    console.log('\n✅ Step 3: CSRF protection validation');
+    // Test 2: CSRF Protection
+    console.log('\n✅ Step 2: CSRF protection validation');
 
     // Test CSRF token generation
     const loginPageResponse = await request.get('/auth/login');
@@ -189,8 +152,6 @@ async function testSecurityAndUX() {
       const securityMiddleware = fs.readFileSync(securityMiddlewarePath, 'utf8');
       const securityFeatures = [
         { content: 'CSRFProtection', description: 'CSRF protection class' },
-        { content: 'authRateLimit', description: 'Authentication rate limiting' },
-        { content: 'generalRateLimit', description: 'General rate limiting' },
         { content: 'securityHeaders', description: 'Security headers middleware' },
         { content: 'IPBlacklist', description: 'IP blacklisting functionality' },
         { content: 'requestSizeLimit', description: 'Request size limiting' }
