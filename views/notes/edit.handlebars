@@ -1,4 +1,4 @@
-<link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css">
+<link rel="stylesheet" href="/libs/quill/quill.snow.css">
 
 <div class="container" style="max-width: 800px; margin: 0 auto; padding: 2rem 1rem;">
   <div style="margin-bottom: 1.5rem;">
@@ -6,6 +6,18 @@
   </div>
 
   <h1 style="margin: 0 0 1.5rem 0;">{{#if note._id}}Edit Note{{else}}New Note{{/if}}</h1>
+
+  <!-- DEBUG: Show what data we're receiving -->
+  <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; font-family: monospace; font-size: 12px;">
+    <strong>DEBUG INFO:</strong><br>
+    Has note: {{#if note}}YES{{else}}NO{{/if}}<br>
+    {{#if note}}
+    Note ID: {{note._id}}<br>
+    Title: "{{note.title}}"<br>
+    Content type: {{note.content.type}}<br>
+    Has content data: {{#if note.content.data}}YES{{else}}NO{{/if}}<br>
+    {{/if}}
+  </div>
 
   <div id="saveStatus" style="margin-bottom: 1rem; font-size: 0.875rem; color: #718096; min-height: 1.25rem;"></div>
 
@@ -42,7 +54,7 @@
   </form>
 </div>
 
-<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script src="/libs/quill/quill.min.js"></script>
 <script>
 (function() {
   var quill = new Quill('#editor', {
@@ -70,16 +82,7 @@
   }
   {{/if}}
 
-  // Handle form submission — serialize Delta to hidden input
-  document.getElementById('noteForm').addEventListener('submit', function(e) {
-    var delta = quill.getContents();
-    document.getElementById('contentData').value = JSON.stringify({
-      type: 'delta',
-      data: delta
-    });
-  });
-
-  // Override the form to send JSON for the API
+  // Handle form submission with AJAX (removed conflicting traditional handler)
   document.getElementById('noteForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
@@ -112,10 +115,18 @@
       });
     })
     .then(function(result) {
+      console.log('🔍 Save response:', result);
+      console.log('🔍 Success check:', result.data.success);
       if (result.data.success) {
+        console.log('🔍 Raw data:', result.data.data);
         var savedNote = result.data.data.note;
-        window.location.href = '/notes/' + savedNote._id;
+        console.log('🔍 Saved note:', savedNote);
+        console.log('🔍 Note ID:', savedNote._id);
+        var redirectUrl = '/notes/' + savedNote._id;
+        console.log('🔍 Redirecting to:', redirectUrl);
+        window.location.href = redirectUrl;
       } else {
+        console.log('🔍 Save failed, showing error');
         showStatus('Save failed: ' + (result.data.message || 'Unknown error'), 'error');
       }
     })

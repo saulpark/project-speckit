@@ -362,12 +362,16 @@ document.addEventListener('DOMContentLoaded', function() {
 document.getElementById('deleteBtn').addEventListener('click', function() {
   if (!confirm('Are you sure you want to delete this note? This cannot be undone.')) return;
 
+  const token = localStorage.getItem('token');
+  const deleteHeaders = { 'Content-Type': 'application/json' };
+  if (token) {
+    deleteHeaders['Authorization'] = 'Bearer ' + token;
+  }
+
   fetch('/notes/{{note._id}}', {
     method: 'DELETE',
-    headers: {
-      'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
-      'Content-Type': 'application/json'
-    }
+    headers: deleteHeaders,
+    credentials: 'include'
   })
   .then(function(res) {
     if (res.ok) {
@@ -428,10 +432,15 @@ document.getElementById('emailInput').addEventListener('keypress', function(e) {
 function loadSharingInfo() {
   showLoading(true);
 
+  const token = localStorage.getItem('token');
+  const headers = {};
+  if (token) {
+    headers['Authorization'] = 'Bearer ' + token;
+  }
+
   fetch('/notes/{{note._id}}/sharing', {
-    headers: {
-      'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
-    }
+    headers: headers,
+    credentials: 'include'
   })
   .then(function(res) {
     if (res.ok) {
@@ -456,12 +465,16 @@ function loadSharingInfo() {
 function togglePublicSharing() {
   showLoading(true);
 
+  const token = localStorage.getItem('token');
+  const publicHeaders = { 'Content-Type': 'application/json' };
+  if (token) {
+    publicHeaders['Authorization'] = 'Bearer ' + token;
+  }
+
   fetch('/notes/{{note._id}}/share/public', {
     method: 'POST',
-    headers: {
-      'Authorization': 'Bearer ' + (localStorage.getItem('token') || ''),
-      'Content-Type': 'application/json'
-    }
+    headers: publicHeaders,
+    credentials: 'include'
   })
   .then(function(res) {
     if (res.ok) {
@@ -554,11 +567,16 @@ function unshareWithUser(userId, email) {
 
   showLoading(true);
 
+  const token = localStorage.getItem('token');
+  const unshareHeaders = {};
+  if (token) {
+    unshareHeaders['Authorization'] = 'Bearer ' + token;
+  }
+
   fetch('/notes/{{note._id}}/share/user/' + userId, {
     method: 'DELETE',
-    headers: {
-      'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
-    }
+    headers: unshareHeaders,
+    credentials: 'include'
   })
   .then(function(res) {
     if (res.ok) {

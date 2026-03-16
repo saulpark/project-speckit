@@ -336,13 +336,23 @@ SpecKit.dashboard = {
 
   async refreshUserData() {
     try {
-      const isValid = await SpecKit.auth.verifyToken();
-      if (isValid) {
-        SpecKit.auth.updateUIForAuthentication(SpecKit.auth.currentUser);
+      // Use cookie-based authentication check instead of token verification
+      const response = await fetch('/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include cookies
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        SpecKit.auth.currentUser = data.data.user;
+        SpecKit.auth.updateUIForAuthentication(data.data.user);
         SpecKit.utils.showAlert('User data refreshed successfully', 'success');
         this.addActivity('User data refreshed');
       } else {
-        SpecKit.utils.showAlert('Token verification failed', 'error');
+        SpecKit.utils.showAlert('Authentication verification failed', 'error');
       }
     } catch (error) {
       SpecKit.utils.showAlert('Refresh failed: ' + error.message, 'error');
@@ -350,29 +360,39 @@ SpecKit.dashboard = {
   },
 
   async checkTokenStatus() {
-    const token = SpecKit.auth.token;
-    if (!token) {
-      SpecKit.utils.showAlert('No token found', 'warning');
-      return;
-    }
-
     try {
-      const expiration = SpecKit.utils.jwt.getTokenExpiration(token);
-      if (expiration) {
-        const timeRemaining = expiration.getTime() - Date.now();
-        const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
-        const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+      // Check authentication status via API call
+      const response = await fetch('/auth/me', {
+        method: 'GET',
+        credentials: 'include', // Include cookies
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
 
-        if (timeRemaining > 0) {
-          SpecKit.utils.showAlert(`Token expires in ${hours}h ${minutes}m`, 'info');
+      if (response.ok) {
+        const data = await response.json();
+        const tokenPayload = data.data.tokenPayload;
+
+        if (tokenPayload && tokenPayload.exp) {
+          const expiration = new Date(tokenPayload.exp * 1000);
+          const timeRemaining = expiration.getTime() - Date.now();
+          const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+          const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+
+          if (timeRemaining > 0) {
+            SpecKit.utils.showAlert(`Session expires in ${hours}h ${minutes}m`, 'info');
+          } else {
+            SpecKit.utils.showAlert('Session has expired', 'warning');
+          }
         } else {
-          SpecKit.utils.showAlert('Token has expired', 'warning');
+          SpecKit.utils.showAlert('Session is valid (cookie-based authentication)', 'info');
         }
       } else {
-        SpecKit.utils.showAlert('Could not determine token expiration', 'warning');
+        SpecKit.utils.showAlert('Not authenticated - please log in', 'warning');
       }
     } catch (error) {
-      SpecKit.utils.showAlert('Token check error: ' + error.message, 'error');
+      SpecKit.utils.showAlert('Status check error: ' + error.message, 'error');
     }
   },
 

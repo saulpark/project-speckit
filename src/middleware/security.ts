@@ -121,6 +121,15 @@ export class CSRFProtection {
  */
 export function securityHeaders() {
   return (req: Request, res: Response, next: NextFunction) => {
+    // ALWAYS log to verify middleware is running
+    console.log('🔍 Security middleware executed:', {
+      path: req.path,
+      method: req.method,
+      nodeEnv: process.env.NODE_ENV,
+      isDevelopment: process.env.NODE_ENV === 'development',
+      timestamp: new Date().toISOString()
+    });
+
     // Additional security headers
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -141,37 +150,53 @@ export function securityHeaders() {
         "form-action 'self'"
       );
     } else if (req.path.includes('/notes')) {
-      // CSP for notes pages (allows Quill CDN)
-      res.setHeader('Content-Security-Policy',
-        "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline' https://cdn.quilljs.com; " +
-        "style-src 'self' 'unsafe-inline' https://cdn.quilljs.com; " +
-        "img-src 'self' data: https:; " +
-        "font-src 'self' https:; " +
-        "connect-src 'self'; " +
-        "base-uri 'self'; " +
-        "form-action 'self'; " +
-        "frame-ancestors 'self'; " +
-        "object-src 'none'; " +
-        "script-src-attr 'none'; " +
-        "upgrade-insecure-requests"
-      );
+      // CSP for notes pages
+      if (process.env.NODE_ENV === 'development') {
+        // DEVELOPMENT: Disable CSP entirely to test if it's the blocker
+        console.log('🔓 Development mode: CSP disabled for notes pages');
+        // No CSP header = no restrictions
+      } else {
+        // Production CSP - restrictive but allows Quill.js
+        res.setHeader('Content-Security-Policy',
+          "default-src 'self'; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.quilljs.com https://cdn.jsdelivr.net; " +
+          "style-src 'self' 'unsafe-inline' https://cdn.quilljs.com https://cdn.jsdelivr.net; " +
+          "img-src 'self' data: https: blob:; " +
+          "font-src 'self' https: data:; " +
+          "connect-src 'self' https:; " +
+          "base-uri 'self'; " +
+          "form-action 'self'; " +
+          "frame-ancestors 'self'; " +
+          "object-src 'none'; " +
+          "worker-src 'self' blob:; " +
+          "child-src 'self' blob:; " +
+          "media-src 'self' data: blob:; " +
+          "upgrade-insecure-requests"
+        );
+      }
     } else {
-      // Default CSP for other pages
-      res.setHeader('Content-Security-Policy',
-        "default-src 'self'; " +
-        "script-src 'self' 'unsafe-inline'; " +
-        "style-src 'self' 'unsafe-inline'; " +
-        "img-src 'self' data: https:; " +
-        "font-src 'self' https:; " +
-        "connect-src 'self'; " +
-        "base-uri 'self'; " +
-        "form-action 'self'; " +
-        "frame-ancestors 'self'; " +
-        "object-src 'none'; " +
-        "script-src-attr 'none'; " +
-        "upgrade-insecure-requests"
-      );
+      // Default CSP for other pages (dashboard, etc.)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔓 Development mode: CSP disabled for default pages');
+        // No CSP header = no restrictions
+      } else {
+        res.setHeader('Content-Security-Policy',
+          "default-src 'self'; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "img-src 'self' data: https: blob:; " +
+          "font-src 'self' https: data:; " +
+          "connect-src 'self' https:; " +
+          "base-uri 'self'; " +
+          "form-action 'self'; " +
+          "frame-ancestors 'self'; " +
+          "object-src 'none'; " +
+          "worker-src 'self' blob:; " +
+          "child-src 'self' blob:; " +
+          "media-src 'self' data: blob:; " +
+          "upgrade-insecure-requests"
+        );
+      }
     }
 
     next();
@@ -232,6 +257,7 @@ export class IPBlacklist {
   static middleware() {
     return (req: Request, res: Response, next: NextFunction) => {
       const clientIP = req.ip || 'unknown';
+      console.log('🔍 IP Blacklist check:', { clientIP, isBlacklisted: IPBlacklist.isBlacklisted(clientIP), method: req.method, path: req.path });
       if (IPBlacklist.isBlacklisted(clientIP)) {
         console.warn(`Blocked request from blacklisted IP: ${clientIP}`);
         return res.status(403).json({

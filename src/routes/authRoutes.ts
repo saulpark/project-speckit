@@ -79,16 +79,33 @@ router.get('/stats', authenticateToken, AuthController.getAuthStats);
 /**
  * @route   GET /auth/me
  * @desc    Get current authenticated user information
- * @access  Protected - requires valid JWT token
+ * @access  Protected - requires authentication (cookies or tokens)
  */
 router.get('/me', optionalAuthentication, (req: express.Request, res: express.Response) => {
   const authReq = req as any; // AuthenticatedRequest
 
+  // Debug logging for authentication troubleshooting
+  const authHeader = req.headers['authorization'];
+  const hasCookie = req.cookies && req.cookies.authToken;
+
+  console.log('🔍 /auth/me authentication check:', {
+    hasAuthHeader: !!authHeader,
+    hasCookie: !!hasCookie,
+    hasUser: !!authReq.user,
+    userAgent: req.get('User-Agent')?.slice(0, 50),
+    ip: req.ip
+  });
+
   if (!authReq.user) {
     return res.status(401).json({
       success: false,
-      message: 'Not authenticated',
+      message: 'Not authenticated - please log in',
       error: 'NOT_AUTHENTICATED',
+      debug: {
+        hasAuthHeader: !!authHeader,
+        hasCookie: !!hasCookie,
+        middlewareExecuted: true
+      },
       timestamp: new Date().toISOString()
     });
   }
@@ -419,6 +436,50 @@ router.get('/test-registration', (req: express.Request, res: express.Response) =
     <p><a href="/auth/dashboard" style="color: #4361ee;">→ Go to dashboard</a></p>
     </body></html>
   `);
+});
+
+/**
+ * @route   GET /auth/test-auth
+ * @desc    Test authentication status and token information
+ * @access  Public (uses optional authentication)
+ */
+router.get('/test-auth', optionalAuthentication, (req: express.Request, res: express.Response) => {
+  const authReq = req as any; // AuthenticatedRequest
+
+  const authHeader = req.headers['authorization'];
+  const hasCookie = req.cookies && req.cookies.authToken;
+  const hasUser = !!authReq.user;
+
+  res.json({
+    success: true,
+    message: 'Authentication test completed',
+    data: {
+      authentication: {
+        isAuthenticated: hasUser,
+        hasAuthHeader: !!authHeader,
+        hasCookie: !!hasCookie,
+        user: hasUser ? {
+          id: authReq.user.id,
+          email: authReq.user.email,
+          isActive: authReq.user.isActive
+        } : null,
+        tokenInfo: authReq.tokenPayload ? {
+          sub: authReq.tokenPayload.sub,
+          email: authReq.tokenPayload.email,
+          iat: authReq.tokenPayload.iat,
+          exp: authReq.tokenPayload.exp,
+          expiresAt: new Date(authReq.tokenPayload.exp * 1000).toISOString()
+        } : null
+      },
+      debug: {
+        cookies: Object.keys(req.cookies || {}),
+        userAgent: req.get('User-Agent')?.slice(0, 50) + '...',
+        ip: req.ip,
+        path: req.path
+      }
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Export the configured router

@@ -122,10 +122,15 @@ function initializeNoteCardInteractions() {
 
 function updateSharedNotesCount() {
   // Subtle update of shared notes indicators without full page reload
+  const token = localStorage.getItem('token');
+  const apiHeaders = {};
+  if (token) {
+    apiHeaders['Authorization'] = 'Bearer ' + token;
+  }
+
   fetch('/notes/api/shared-with-me?limit=1', {
-    headers: {
-      'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
-    }
+    headers: apiHeaders,
+    credentials: 'include'
   })
   .then(function(res) {
     if (res.ok) {

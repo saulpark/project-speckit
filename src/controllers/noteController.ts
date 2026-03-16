@@ -271,12 +271,17 @@ export class NoteController {
    */
   static async getCreateForm(req: Request, res: Response): Promise<void> {
     try {
+      console.log('🆕 CREATE FORM - New note form requested');
+      console.log('🆕 Request path:', req.path);
+      console.log('🆕 Request URL:', req.originalUrl);
+
       const user = (req as any).user;
 
-      res.render('notes/edit', {
-        pageTitle: 'New Note',
-        note: null,
-        user,
+      // Use fresh edit template for new notes
+      res.render('notes/fresh-edit', {
+        title: 'New Note',
+        note: { title: '', content: { preview: '' } }, // Empty note for new form
+        user: user
       });
 
     } catch (error) {
@@ -296,13 +301,27 @@ export class NoteController {
    */
   static async getEditForm(req: Request, res: Response): Promise<void> {
     try {
+      console.log('✏️ EDIT FORM - Existing note edit requested');
+      console.log('✏️ Request path:', req.path);
+      console.log('✏️ Request URL:', req.originalUrl);
+      console.log('✏️ Route params:', req.params);
+
       const note = (req as any).note;
       const user = (req as any).user;
 
-      res.render('notes/edit', {
-        pageTitle: `Edit: ${note.title || 'Note'}`,
-        note,
-        user,
+      if (!note) {
+        res.status(404).json({ error: 'Note not found' });
+        return;
+      }
+
+      // Convert to plain object for template
+      const noteData = note.toObject ? note.toObject() : note;
+
+      // Render edit template
+      res.render('notes/fresh-edit', {
+        title: `Edit: ${noteData.title || 'Untitled'}`,
+        note: noteData,
+        user: user
       });
 
     } catch (error) {
@@ -355,7 +374,7 @@ export class NoteController {
         htmlContent = notePlain.content.preview.replace(/\n/g, '<br>');
       }
 
-      res.render('notes/show', {
+      res.render('notes/fresh-view', {
         pageTitle: notePlain.title || 'Note',
         note: {
           ...notePlain,

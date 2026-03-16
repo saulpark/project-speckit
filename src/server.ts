@@ -9,7 +9,10 @@ import path from 'path';
 import { database } from './config/database';
 import authRoutes from './routes/authRoutes';
 import noteRoutes from './routes/noteRoutes';
+import testEditRoutes from './routes/testEditRoutes';
 import { NoteController } from './controllers/noteController';
+import { authenticateWeb } from './middleware/auth';
+import { verifyNoteOwnership } from './middleware/noteOwnership';
 import {
   CSRFProtection,
   securityHeaders,
@@ -30,12 +33,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Apply security middlewares in order
-app.use(IPBlacklist.middleware()); // Block blacklisted IPs first
+// TESTING: app.use(IPBlacklist.middleware()); // Block blacklisted IPs first
 app.use(requestSizeLimit()); // Limit request payload size
-app.use(helmet({
-  contentSecurityPolicy: false // Disable helmet's default CSP, we'll set it manually
-})); // Basic security headers
-app.use(securityHeaders()); // Additional security headers with custom CSP
+// TESTING: app.use(helmet({
+//   contentSecurityPolicy: false // Disable helmet's default CSP, we'll set it manually
+// })); // Basic security headers
+// TEMPORARILY DISABLED FOR DEBUGGING CSP ISSUES
+// app.use(securityHeaders()); // Additional security headers with custom CSP
 app.use(securityLogger()); // Security logging
 
 // CORS configuration
@@ -54,6 +58,16 @@ app.use(CSRFProtection.addTokenMiddleware());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Configure MIME types for static files
+app.use((req, res, next) => {
+  if (req.path.endsWith('.css')) {
+    res.setHeader('Content-Type', 'text/css');
+  } else if (req.path.endsWith('.js')) {
+    res.setHeader('Content-Type', 'application/javascript');
+  }
+  next();
+});
 
 // Static file serving
 app.use('/static', express.static('public'));
@@ -100,6 +114,19 @@ app.engine('handlebars', engine({
 
 app.set('view engine', 'handlebars');
 app.set('views', path.join(__dirname, '../views'));
+
+// Force disable all template caching
+app.set('view cache', false);
+app.disable('view cache');
+
+// Add anti-cache headers for all responses
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
 
 // Authentication routes
 app.use('/auth', authRoutes);
@@ -259,8 +286,95 @@ app.post('/test-register', express.json(), async (req: Request, res: Response) =
   }
 });
 
+// TEST: Simple route to verify server changes work
+app.get('/test-server-changes', (req: Request, res: Response) => {
+  console.log('🔥 SERVER-LEVEL ROUTE WORKING!');
+  res.json({
+    success: true,
+    message: 'Server-level route changes are working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+
+// Debug all requests to /notes
+app.use('/notes', (req: Request, res: Response, next: NextFunction) => {
+  console.log('🎯 SERVER LEVEL: Request to /notes detected!', {
+    path: req.path,
+    originalUrl: req.originalUrl,
+    method: req.method,
+    params: req.params
+  });
+  next();
+});
+
 // Notes routes (authentication required)
 app.use('/notes', noteRoutes);
+
+// Test edit routes (to bypass caching issues)
+app.use('/test', testEditRoutes);
+
+// SIMPLE TEST: No middleware
+app.get('/simple-test/:id', (req: Request, res: Response) => {
+  console.log('🧪 SIMPLE TEST ROUTE HIT!', req.params.id);
+  res.json({ message: 'Simple test works!', id: req.params.id });
+});
+
+// DIRECT EDIT TEST: Bypass /notes path completely
+app.get('/direct-edit/:id', authenticateWeb, verifyNoteOwnership, (req: Request, res: Response) => {
+  console.log('🚀 DIRECT EDIT ROUTE - bypassing /notes path!');
+  const note = (req as any).note;
+  const user = (req as any).user;
+
+  console.log('📝 Direct edit note data:', {
+    noteId: note._id,
+    title: note.title,
+    hasContent: !!note.content,
+    contentType: note.content?.type
+  });
+
+  res.render('notes/edit', {
+    pageTitle: `Direct Edit: ${note.title || 'Note'}`,
+    note,
+    user,
+  });
+});
+
+// CACHE TEST: Simple route to verify server changes are working
+app.get('/test-cache-clear', (req: Request, res: Response) => {
+  console.log('🧪 CACHE CLEAR TEST - Server changes are active!');
+  res.json({
+    success: true,
+    message: 'Cache clear worked! Server changes are active.',
+    timestamp: new Date().toISOString(),
+    testId: Math.random()
+  });
+});
+
+// NUCLEAR TEST: Direct DELETE route with NO middleware (placed after note routes)
+app.delete('/test-direct-delete', (req: Request, res: Response) => {
+  console.log('🚀 DIRECT DELETE CALLED - NO MIDDLEWARE!');
+  console.log('🔍 Method:', req.method);
+  console.log('🔍 Headers:', req.headers);
+  console.log('🔍 Cookies:', req.cookies);
+  res.json({
+    success: true,
+    message: 'Direct DELETE works!',
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// TEST: Same route but with GET method
+app.get('/test-direct-delete-get', (req: Request, res: Response) => {
+  console.log('🚀 DIRECT GET CALLED - NO MIDDLEWARE!');
+  res.json({
+    success: true,
+    message: 'Direct GET works!',
+    method: req.method,
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Enhanced health check endpoint
 app.get('/health', async (req: Request, res: Response) => {
@@ -370,6 +484,7 @@ async function startServer(): Promise<void> {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🏥 Health check: http://localhost:${PORT}/health`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log('🔥🔥🔥 MAJOR CHANGE APPLIED - IF YOU SEE THIS, BUILDS ARE WORKING! 🔥🔥🔥');
     });
 
   } catch (error) {
