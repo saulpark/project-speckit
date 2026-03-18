@@ -234,10 +234,10 @@ describe('JWTUtils', () => {
       expect(extractedToken).toBeNull();
     });
 
-    it('should handle Bearer without token as fallback', () => {
+    it('should handle Bearer without token as null (security fix)', () => {
       const extractedToken = JWTUtils.extractTokenFromHeader('Bearer');
 
-      expect(extractedToken).toBe('Bearer'); // Fallback behavior
+      expect(extractedToken).toBe(null); // Correctly reject malformed Bearer headers
     });
   });
 
