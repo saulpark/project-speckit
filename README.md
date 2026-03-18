@@ -25,6 +25,20 @@ A modern, full-stack note-taking application built with Node.js, TypeScript, and
 - **Shared Notes View**: Dedicated interface for notes shared with you
 - **Share Management**: Add/remove users and toggle public access via UI
 
+### 👤 User Profile Management
+- **Profile Page**: View and edit display name at `/profile`
+- **Password Change**: Secure password change with current password verification and full token invalidation
+- **User Statistics**: Note count, public and shared note counts, member since date
+- **Input Validation**: Server-side validation with express-validator; HTML sanitization
+
+### 🛡️ Admin Interface
+- **Admin Dashboard**: System-wide statistics (user counts, note counts, activity metrics)
+- **User Management**: Paginated, searchable, filterable user list at `/admin/users`
+- **Status Control**: Activate/deactivate user accounts (admin users protected)
+- **Recent Activity**: New users, new notes, and recent logins within configurable time window
+- **Role-Based Access**: `requireAdmin` and `requireAdminWeb` middleware enforce admin-only access
+- **Admin Rate Limiting**: 50 actions per 5 minutes; 10 status changes per minute
+
 ### 🏗️ Architecture & Quality
 - **Layered Architecture**: Controllers → Services → Models separation
 - **TypeScript**: Full type safety with strict mode
@@ -41,7 +55,9 @@ A modern, full-stack note-taking application built with Node.js, TypeScript, and
 | Logout Enhancement | 002 | ✅ Complete | Server-side token blacklisting |
 | Notes CRUD | 003 | ✅ Complete | Rich text notes with Quill.js |
 | Note Sharing | 004 | ✅ Complete | Public links and user sharing |
-| User Management | 005 | 🚧 In Progress | Enhanced user profile features |
+| User Management — Profile & Password | 005 (Phase 1-2) | ✅ Complete | Display name, password change, user stats |
+| User Management — Admin Interface | 005 (Phase 3) | ✅ Complete | Dashboard, user management, system stats |
+| User Management — Testing & Polish | 005 (Phase 4) | 🚧 In Progress | Unit/integration tests pending |
 
 ## 🛠️ Technology Stack
 
@@ -100,10 +116,9 @@ claude SpecKit implement .specify/specs/XXX/  # Execute implementation
 │   └── spec-template.md
 └── specs/
     ├── 001-authentication/      # Complete
-    ├── 002-logout-enhancement/  # Complete
+    ├── 002-user-management/     # In Progress (Spec 005; Phases 1-3 complete)
     ├── 003-notes-crud/          # Complete
-    ├── 004-note-sharing/        # Complete
-    └── 005-user-management/     # Draft
+    └── 004-note-sharing/        # Complete
 ```
 
 ## 🚀 Quick Start
@@ -217,6 +232,32 @@ npm run db:reset # Reset database (development only)
 | `GET` | `/notes/:id/view` | View note page |
 | `GET` | `/notes/:id/edit` | Edit note form |
 | `GET` | `/notes/shared-with-me` | Shared notes view |
+| `GET` | `/profile` | User profile management page |
+| `GET` | `/admin` | Admin dashboard (admin role required) |
+| `GET` | `/admin/users` | User management page (admin role required) |
+
+### 👤 User Profile
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/profile` | Required | Profile management page |
+| `GET` | `/profile/api` | Required | Get profile data (JSON) |
+| `PUT` | `/profile/api` | Required | Update display name |
+| `GET` | `/profile/api/stats` | Required | Get user statistics (JSON) |
+| `POST` | `/profile/change-password` | Required | Change password (invalidates all tokens) |
+| `GET` | `/profile/health` | None | Profile service health check |
+
+### 🛡️ Admin Interface (Admin Role Required)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/admin` | Admin | Admin dashboard page |
+| `GET` | `/admin/users` | Admin | User management page |
+| `GET` | `/admin/api/stats` | Admin | System statistics (JSON) |
+| `GET` | `/admin/api/users` | Admin | Paginated user list with search/filter (JSON) |
+| `GET` | `/admin/api/users/search` | Admin | Search users by email or display name (JSON) |
+| `GET` | `/admin/api/users/:id` | Admin | User details with note statistics (JSON) |
+| `PUT` | `/admin/api/users/:id/status` | Admin | Toggle user active/inactive status |
+| `GET` | `/admin/api/activity` | Admin | Recent system activity (JSON) |
+| `GET` | `/admin/health` | None | Admin service health check |
 
 ### 🌍 Public Access
 | Method | Endpoint | Auth | Description |
@@ -370,11 +411,11 @@ src/
 ├── server.ts                 # Application entry point
 ├── config/
 │   └── database.ts          # MongoDB connection
-├── controllers/             # Request handlers
-├── services/               # Business logic
-├── models/                 # Mongoose schemas
-├── middleware/             # Express middleware
-├── routes/                 # Route definitions
+├── controllers/             # Request handlers (auth, note, profile, admin)
+├── services/               # Business logic (auth, note, user, admin, tokenBlacklist)
+├── models/                 # Mongoose schemas (User, Note)
+├── middleware/             # Express middleware (auth, adminAuth, validation, security, etc.)
+├── routes/                 # Route definitions (auth, note, profile, admin)
 ├── utils/                  # Utility functions
 └── types/                  # TypeScript type definitions
 ```
@@ -409,10 +450,9 @@ src/
 ├── constitution.md              # Project principles
 ├── specs/
 │   ├── 001-authentication/      # ✅ Complete
-│   ├── 002-logout-enhancement/  # ✅ Complete
+│   ├── 002-user-management/     # 🚧 In Progress (Spec 005; Phases 1-3 implemented)
 │   ├── 003-notes-crud/         # ✅ Complete
-│   ├── 004-note-sharing/       # ✅ Complete
-│   └── 005-user-management/    # 🚧 In Progress
+│   └── 004-note-sharing/       # ✅ Complete
 └── templates/
     └── spec-template.md         # Specification template
 ```
