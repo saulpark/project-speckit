@@ -459,11 +459,8 @@ src/
 
 ## 📄 Documentation
 
-- **[Technical Specification](./TECH-SPEC.md)** - Detailed architecture documentation
-- **[API Documentation](./docs/api.md)** - Complete API reference
-- **[Security Audit](./AUDIT.md)** - Security review and compliance
-- **[Deployment Guide](./docs/deployment.md)** - Production deployment instructions
 - **[Development Guide](./CLAUDE.md)** - Claude Code instructions and patterns
+- **[Specification Files](./.specify/)** - Authoritative spec-driven development documentation
 
 ---
 
