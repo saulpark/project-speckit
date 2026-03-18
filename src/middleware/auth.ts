@@ -4,16 +4,9 @@ import { AuthService } from '../services/authService';
 import { TokenBlacklistService } from '../services/tokenBlacklistService';
 
 /**
- * Extended Request interface to include authenticated user
+ * JWT Payload extension for request
  */
-export interface AuthenticatedRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  };
+export interface JWTRequest extends Request {
   tokenPayload?: JWTPayload;
 }
 
@@ -22,7 +15,7 @@ export interface AuthenticatedRequest extends Request {
  * Use this for pages that should show HTML views
  */
 export const authenticateWeb = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -84,7 +77,7 @@ export const authenticateWeb = async (
  * Use this for API endpoints that should return JSON responses
  */
 export const authenticateToken = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -200,7 +193,7 @@ export const authenticateToken = async (
  * Adds user context if token is valid, but doesn't block request if no token
  */
 export const optionalAuthentication = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -273,7 +266,7 @@ export const optionalAuthentication = async (
  * Can be chained after authenticateToken for role-based access
  */
 export const requireRole = (roles: string[]) => {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       res.status(401).json({
         success: false,
@@ -295,7 +288,7 @@ export const requireRole = (roles: string[]) => {
  * Middleware to extract user info from token for API responses
  */
 export const extractUserInfo = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -323,7 +316,7 @@ export const extractUserInfo = async (
  * Returns JSON errors instead of redirecting (for AJAX calls)
  */
 export const authenticateAPI = async (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -422,7 +415,7 @@ export const authenticateAPI = async (
  * Returns new token in response header if refreshed
  */
 export const refreshTokenIfNeeded = (
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): void => {

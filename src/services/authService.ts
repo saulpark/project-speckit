@@ -28,6 +28,7 @@ export interface UserResponse {
   id: string;
   email: string;
   isActive: boolean;
+  role: 'user' | 'admin';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -109,6 +110,7 @@ export class AuthService {
         id: savedUser._id.toString(),
         email: savedUser.email,
         isActive: savedUser.isActive,
+        role: savedUser.role,
         createdAt: savedUser.createdAt,
         updatedAt: savedUser.updatedAt
       };
@@ -197,6 +199,7 @@ export class AuthService {
           id: user._id.toString(),
           email: user.email,
           isActive: user.isActive,
+          role: user.role,
           createdAt: user.createdAt,
           updatedAt: user.updatedAt
         },
@@ -236,6 +239,7 @@ export class AuthService {
         id: user._id.toString(),
         email: user.email,
         isActive: user.isActive,
+        role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       };
@@ -261,6 +265,7 @@ export class AuthService {
         id: user._id.toString(),
         email: user.email,
         isActive: user.isActive,
+        role: user.role,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       };

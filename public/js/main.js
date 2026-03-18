@@ -665,6 +665,25 @@ SpecKit.forms = {
   }
 };
 
+// Mobile Navigation
+window.toggleMobileMenu = function() {
+  const navMenu = document.querySelector('.nav-menu');
+  const mobileMenuBtn = document.querySelector('.mobile-menu-btn i');
+
+  if (navMenu) {
+    navMenu.classList.toggle('active');
+
+    // Toggle icon between hamburger and close
+    if (mobileMenuBtn) {
+      if (navMenu.classList.contains('active')) {
+        mobileMenuBtn.className = 'fas fa-times';
+      } else {
+        mobileMenuBtn.className = 'fas fa-bars';
+      }
+    }
+  }
+};
+
 // Add CSS animations
 const style = document.createElement('style');
 style.textContent = `

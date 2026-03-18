@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import { AuthService, AuthError } from '../services/authService';
 import { TokenBlacklistService } from '../services/tokenBlacklistService';
 import { JWTUtils } from '../utils/jwt';
-import { AuthenticatedRequest } from '../middleware/auth';
 
 /**
  * Interface for registration request body

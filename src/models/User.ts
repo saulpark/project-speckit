@@ -10,6 +10,13 @@ export interface IUser extends Document {
   createdAt: Date;
   updatedAt: Date;
 
+  // New fields for user management
+  displayName?: string;
+  role: 'user' | 'admin';
+  passwordChangedAt?: Date;
+  deactivatedAt?: Date;
+  lastLoginAt?: Date;
+
   // Instance methods
   verifyPassword(password: string): Promise<boolean>;
 }
@@ -45,14 +52,46 @@ const userSchema = new Schema<IUser>({
     type: Boolean,
     default: true,
     index: true
+  },
+
+  // New fields for user management
+  displayName: {
+    type: String,
+    maxlength: [50, 'Display name cannot exceed 50 characters'],
+    trim: true,
+    default: null
+  },
+  role: {
+    type: String,
+    enum: {
+      values: ['user', 'admin'],
+      message: 'Role must be either user or admin'
+    },
+    default: 'user',
+    index: true
+  },
+  passwordChangedAt: {
+    type: Date,
+    default: null
+  },
+  deactivatedAt: {
+    type: Date,
+    default: null
+  },
+  lastLoginAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true, // Automatically adds createdAt and updatedAt
   collection: 'users'
 });
 
-// Create compound index for email queries
+// Create compound indexes for performance
 userSchema.index({ email: 1, isActive: 1 });
+userSchema.index({ role: 1 }); // For admin queries
+userSchema.index({ isActive: 1, createdAt: -1 }); // For active user listings
+userSchema.index({ email: 1, role: 1 }); // For admin user search
 
 // Instance method: Verify password against stored hash
 userSchema.methods.verifyPassword = async function(password: string): Promise<boolean> {
