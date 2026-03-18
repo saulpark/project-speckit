@@ -109,6 +109,7 @@ claude SpecKit implement .specify/specs/XXX/  # Execute implementation
 ```
 .specify/
 ├── constitution.md              # Project governing principles
+├── config.yaml                  # Spec-Kit configuration
 ├── memory/
 │   ├── constitution.md          # Constitution memory copy
 │   └── technical-requirements.md
@@ -116,9 +117,9 @@ claude SpecKit implement .specify/specs/XXX/  # Execute implementation
 │   └── spec-template.md
 └── specs/
     ├── 001-authentication/      # Complete
-    ├── 002-user-management/     # In Progress (Spec 005; Phases 1-3 complete)
     ├── 003-notes-crud/          # Complete
-    └── 004-note-sharing/        # Complete
+    ├── 004-note-sharing/        # Complete
+    └── 005-user-management/     # In Progress (Phases 1-3 complete; Phase 4 testing pending)
 ```
 
 ## 🚀 Quick Start
@@ -448,11 +449,13 @@ src/
 ```
 .specify/
 ├── constitution.md              # Project principles
+├── config.yaml                  # Spec-Kit configuration
+├── memory/                      # Memory files for spec context
 ├── specs/
 │   ├── 001-authentication/      # ✅ Complete
-│   ├── 002-user-management/     # 🚧 In Progress (Spec 005; Phases 1-3 implemented)
-│   ├── 003-notes-crud/         # ✅ Complete
-│   └── 004-note-sharing/       # ✅ Complete
+│   ├── 003-notes-crud/          # ✅ Complete
+│   ├── 004-note-sharing/        # ✅ Complete
+│   └── 005-user-management/     # In Progress (Phases 1-3 complete; testing pending)
 └── templates/
     └── spec-template.md         # Specification template
 ```

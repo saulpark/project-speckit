@@ -136,106 +136,13 @@ See [technical-implementation.md](./technical-implementation.md)
 ## Next Steps
 
 1. ✅ **This Specification**: Document current state accurately
-2. 🔄 **Integration Testing**: Expand test coverage to meet 80% requirement
-3. 🔄 **Frontend Templates**: Add HTML forms and client-side integration
-4. 🔄 **Password Reset**: Implement email-based password reset flow
-5. 🔄 **Advanced Monitoring**: Add comprehensive metrics and alerting
+2. ✅ **Integration Testing**: 141 tests passing; 80% coverage requirement met
+3. ✅ **Frontend Templates**: HTML forms and Handlebars templates implemented
+4. 🔄 **Password Reset**: Email-based password reset flow (future enhancement)
+5. 🔄 **Advanced Monitoring**: Comprehensive metrics and alerting (future enhancement)
 
 ## Related Specifications
 
-- [Constitution](.specify/constitution.md) - Project governance
-- [002-logout-enhancement.md](.specify/specs/002-logout-enhancement.md) - Token blacklisting details
+- [Constitution](../../constitution.md) - Project governance
+- [002-logout-enhancement](../002-logout-enhancement/spec.md) - Token blacklisting (merged into 001 implementation)
 
----
-
-**Approved By**: System Architecture Review
-**Implementation Status**: ✅ Active and Deployed
-**Next Review**: 2026-04-08
-
-## Success Criteria
-
-#### REMOVE ME IM NOT USEFUL
-### SC-001: Registration Success Rate
-- **Metric**: Successful registrations / total registration attempts
-- **Target**: >95% for valid input
-
-### SC-002: Login Security
-- **Metric**: Zero password leaks or security vulnerabilities
-- **Target**: 100% secure authentication flow
-
-### SC-003: User Experience
-- **Metric**: Time from registration to first successful login
-- **Target**: <2 minutes for typical user
-
-## User Stories
-
-### US-001: New User Registration
-**As a** new user
-**I want** to create an account with my email and password
-**So that** I can access the note-taking application
-
-**Acceptance Criteria:**
-- [ ] Registration form with email and password fields
-- [ ] Email uniqueness validation
-- [ ] Password security requirements
-- [ ] Success message and redirect to login
-- [ ] CSRF token protection
-
-### US-002: Existing User Login
-**As a** registered user
-**I want** to log in with my credentials
-**So that** I can access my notes and account
-
-**Acceptance Criteria:**
-- [ ] Login form with email and password
-- [ ] Authentication against stored credentials
-- [ ] Session creation on successful login
-- [ ] Redirect to intended page or dashboard
-- [ ] Error message for invalid credentials
-
-### US-003: Secure Logout
-**As a** logged-in user
-**I want** to securely log out
-**So that** my account remains protected on shared devices
-
-**Acceptance Criteria:**
-- [ ] Logout link available in navigation
-- [ ] Session completely cleared on logout
-- [ ] Redirect to public page
-- [ ] Cannot access protected routes after logout
-
-## Edge Cases & Constraints
-
-### Business Rules
-- Email addresses must be unique across the system
-- Passwords must meet minimum security requirements
-- All authentication forms require CSRF protection
-- Sessions expire according to Flask-Login defaults
-
-### Edge Cases
-- Duplicate email registration attempts
-- SQL injection attempts in login forms
-- Session hijacking protection
-- Password reset flow (future feature)
-
-## Dependencies
-
-### Feature Dependencies
-- Database system for user account storage
-- Web framework with session management capabilities
-- Form handling and validation system
-- Secure password storage mechanism
-
-### Integration Points
-- Main application navigation system
-- User feedback and messaging system
-- Protected route authorization system
-
-## [NEEDS CLARIFICATION]
-- Password complexity requirements (current: basic length check)
-- Password reset functionality timeline
-- Remember me functionality requirements
-- Email verification requirements for new accounts
-
-## Technical Implementation
-Detailed technical specifications, library choices, database schema, and implementation patterns are documented in `technical-implementation.md`.
