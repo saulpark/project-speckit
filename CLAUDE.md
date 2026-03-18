@@ -13,26 +13,33 @@ src/
 ├── config/
 │   └── database.ts                # MongoDB connection and health check
 ├── models/
-│   ├── User.ts                    # User schema (email, passwordHash, isActive)
+│   ├── User.ts                    # User schema (email, passwordHash, isActive, displayName, role, lastLoginAt, passwordChangedAt, deactivatedAt)
 │   └── Note.ts                    # Note schema (userId, title, content, isPublic, sharedWith, tags)
 ├── controllers/
 │   ├── authController.ts          # Registration, login, logout, profile handlers
-│   └── noteController.ts          # Note CRUD + sharing endpoint handlers
+│   ├── noteController.ts          # Note CRUD + sharing endpoint handlers
+│   ├── profileController.ts       # User profile view/update, password change, user stats
+│   └── adminController.ts         # Admin dashboard, user management, system stats, activity
 ├── services/
 │   ├── authService.ts             # User registration and authentication logic
 │   ├── noteService.ts             # Note CRUD, public sharing, user sharing operations
-│   ├── tokenBlacklistService.ts   # In-memory JWT token blacklist
-│   └── userService.ts             # User lookup for sharing operations
+│   ├── tokenBlacklistService.ts   # In-memory JWT token blacklist; blacklistAllUserTokens for password changes
+│   ├── userService.ts             # User lookup, profile management, password change, user stats
+│   └── adminService.ts            # Admin-only: getAllUsers, getSystemStats, toggleUserStatus, getUserWithStats, searchUsers, getRecentActivity
 ├── middleware/
 │   ├── auth.ts                    # authenticateToken, authenticateWeb, optionalAuthentication
+│   ├── adminAuth.ts               # requireAdmin (API), requireAdminWeb (HTML), optionalAdmin
 │   ├── noteOwnership.ts           # verifyNoteOwnership, verifyNoteAccessOrShared
 │   ├── noteValidation.ts          # validateNote, validateNoteUpdate
+│   ├── profileValidation.ts       # validateProfileUpdate, validatePasswordChange, sanitizeProfileInput, validateRateLimit
 │   ├── validation.ts              # validateRegistration, validateLogin, handleValidationErrors
 │   ├── security.ts                # CSRFProtection, securityHeaders, securityLogger, IPBlacklist, requestSizeLimit
 │   └── errorHandler.ts            # globalErrorHandler, notFoundHandler, generateClientErrorHandler
 ├── routes/
 │   ├── authRoutes.ts              # All /auth/* routes
 │   ├── noteRoutes.ts              # All /notes/* routes
+│   ├── profileRoutes.ts           # All /profile/* routes (web + API); rate limiting for password changes
+│   ├── adminRoutes.ts             # All /admin/* routes (web + API); admin rate limiting
 │   └── testEditRoutes.ts          # Debug/test routes (dev only)
 └── utils/
     ├── jwt.ts                     # JWT generation and verification
@@ -52,6 +59,11 @@ views/
 │   ├── login.handlebars
 │   └── register.handlebars
 ├── dashboard.handlebars
+├── profile/
+│   └── index.handlebars           # User profile page: display name edit, password change form, user stats
+├── admin/
+│   ├── dashboard.handlebars       # Admin dashboard: system stats cards, recent activity
+│   └── users.handlebars           # User management: search/filter table, paginated, status toggles (JS-loaded)
 └── notes/
     ├── list.handlebars            # Paginated note cards with sharing badges
     ├── show.handlebars            # Note view (legacy, not actively routed)
@@ -98,6 +110,15 @@ verifyNoteAccessOrShared — owner OR sharedWith user (used for read GET /notes/
 NoteController.getPublicNote — no auth (isPublic: true only)
 ```
 
+## Admin Access Model
+```
+requireAdmin    — role === 'admin' check for JSON API routes; returns 401/403 JSON on failure
+requireAdminWeb — role === 'admin' check for HTML routes; redirects to /auth/login on failure
+optionalAdmin   — sets req.isAdmin flag; never blocks access (used for conditional UI)
+```
+Admin users cannot deactivate themselves or other admin accounts.
+Admin role is set directly in the database; there is no self-promotion endpoint.
+
 ## Docker Development Workflow
 CRITICAL: Use full rebuild cycle, not just restart:
 ```bash
@@ -132,7 +153,7 @@ A plain `docker-compose restart` does not pick up new TypeScript builds.
 | 002 | Logout Enhancement (token blacklisting) | Complete |
 | 003 | Notes CRUD | Complete |
 | 004 | Note Sharing | Complete (backend + UI; branch: `implement_sharing_notes`) |
-| 005 | User Management | Draft |
+| 005 | User Management | In Progress — Phase 1 (Profile), Phase 2 (Password Change), Phase 3 (Admin Interface) implemented; Phase 4 (Testing) pending |
 
 ## Quality Assurance
 - TypeScript compilation: `npm run build`

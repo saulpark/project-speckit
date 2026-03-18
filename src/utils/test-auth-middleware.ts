@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { authenticateToken, optionalAuthentication, AuthenticatedRequest } from '../middleware/auth';
+import { authenticateToken, optionalAuthentication } from '../middleware/auth';
 import { JWTUtils } from '../utils/jwt';
 import { AuthService } from '../services/authService';
 import { database } from '../config/database';
@@ -9,11 +9,11 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Mock Express Request, Response, and NextFunction
-const createMockRequest = (headers: any = {}): AuthenticatedRequest => ({
+const createMockRequest = (headers: any = {}): Request => ({
   headers,
   user: undefined,
   tokenPayload: undefined
-} as AuthenticatedRequest);
+} as Request);
 
 const createMockResponse = (): { res: Response; getResponseData: () => any; getStatusCode: () => number } => {
   let responseData: any = null;

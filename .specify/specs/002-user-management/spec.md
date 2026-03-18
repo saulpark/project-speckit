@@ -7,7 +7,7 @@
 **Depends On**: 001-authentication ✅ Complete
 
 ## Overview
-Administrative and self-service user management capabilities: profile editing, account deactivation, password change, and admin-level user oversight.
+Administrative and self-service user management capabilities: profile editing, password change, and admin-level user oversight.
 
 ## Requirements
 
@@ -28,41 +28,36 @@ Administrative and self-service user management capabilities: profile editing, a
   - Confirmation email (future enhancement)
 - **Priority**: High
 
-### FR-003: Account Deactivation
-- **Description**: Users can deactivate their own account
-- **Acceptance Criteria**:
-  - Sets `isActive: false` on User document
-  - All active tokens immediately blacklisted
-  - Deactivated accounts cannot log in
-  - Notes are preserved (not deleted)
-- **Priority**: Medium
-
-### FR-004: Admin User List (Admin Only)
+### FR-003: Admin User List (Admin Only)
 - **Description**: Admins can view and manage all user accounts
 - **Acceptance Criteria**:
-  - Paginated user list with email, status, createdAt
-  - Ability to activate/deactivate accounts
+  - Paginated user list with email, role, createdAt
   - View user note counts
+  - User search and filtering capabilities
   - Protected behind admin role check
 - **Priority**: Low
 
 ## Edge Cases & Constraints
 - Password change requires current password (no anonymous change)
-- Account deactivation is reversible (admin can reactivate)
-- Admin role must be defined (new `role` field on User model or separate collection)
+- Admin role must be defined (new `role` field on User model)
+- Admin users cannot modify their own role or delete themselves
 
 ## Dependencies
 
 ### Feature Dependencies
-- 001-authentication — User model, JWT middleware, password hashing utilities
-- 003-notes-crud — Note counts on user profile
+- 001-authentication — User identity and JWT middleware
+- 003-notes-crud — Existing note management functionality
 
-### Model Changes Required
-- `User.role: 'user' | 'admin'` (default: `'user'`)
-- `User.displayName: String` (optional)
+### Technical Implementation
+See [technical-implementation.md](./technical-implementation.md) for:
+- Database schema extensions
+- API endpoint specifications
+- Security architecture details
+- Frontend implementation guide
+- Performance and testing strategy
 
 ## Future Enhancements
 - OAuth / social login integration
 - Two-factor authentication
 - Login history and active sessions view
-- GDPR data export
+- GDPR data export capabilities

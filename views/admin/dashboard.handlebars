@@ -1,0 +1,231 @@
+<!-- Admin CSS -->
+<link rel="stylesheet" href="/css/admin.css">
+
+{{!-- Admin Dashboard Page --}}
+<div class="admin-container">
+  {{!-- Page Header --}}
+  <div class="admin-header">
+    <h1><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h1>
+    <p class="admin-subtitle">System overview and management</p>
+  </div>
+
+  {{!-- Alert Messages --}}
+  {{#if messages.success}}
+    <div class="alert alert-success">
+      <i class="fas fa-check-circle"></i>
+      {{messages.success}}
+    </div>
+  {{/if}}
+
+  {{#if messages.error}}
+    <div class="alert alert-error">
+      <i class="fas fa-exclamation-circle"></i>
+      {{messages.error}}
+    </div>
+  {{/if}}
+
+  {{!-- Statistics Grid --}}
+  <div class="stats-grid">
+    <div class="stat-card users-card">
+      <div class="stat-icon">
+        <i class="fas fa-users"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-main">
+          <span class="stat-number">{{stats.users.total}}</span>
+          <span class="stat-label">Total Users</span>
+        </div>
+        <div class="stat-details">
+          <span class="stat-detail">{{stats.users.active}} active</span>
+          <span class="stat-percentage {{#if (gt stats.activePercentage 80)}}positive{{else}}neutral{{/if}}">
+            {{stats.activePercentage}}%
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card notes-card">
+      <div class="stat-icon">
+        <i class="fas fa-sticky-note"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-main">
+          <span class="stat-number">{{stats.notes.total}}</span>
+          <span class="stat-label">Total Notes</span>
+        </div>
+        <div class="stat-details">
+          <span class="stat-detail">{{stats.notes.createdToday}} today</span>
+          <span class="stat-change {{#if (gt stats.notes.createdToday 0)}}positive{{else}}neutral{{/if}}">
+            +{{stats.notes.createdThisWeek}} this week
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card sharing-card">
+      <div class="stat-icon">
+        <i class="fas fa-share-alt"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-main">
+          <span class="stat-number">{{stats.notes.shared}}</span>
+          <span class="stat-label">Shared Notes</span>
+        </div>
+        <div class="stat-details">
+          <span class="stat-detail">{{stats.notes.public}} public</span>
+          <span class="stat-percentage">{{stats.sharedPercentage}}%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card activity-card">
+      <div class="stat-icon">
+        <i class="fas fa-chart-line"></i>
+      </div>
+      <div class="stat-content">
+        <div class="stat-main">
+          <span class="stat-number">{{stats.activity.activeUsersToday}}</span>
+          <span class="stat-label">Active Today</span>
+        </div>
+        <div class="stat-details">
+          <span class="stat-detail">{{stats.activity.activeUsersThisWeek}} this week</span>
+          <span class="stat-metric">{{stats.activity.averageNotesPerUser}} notes/user</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{!-- Action Cards --}}
+  <div class="action-cards">
+    <div class="action-card">
+      <div class="action-icon">
+        <i class="fas fa-users-cog"></i>
+      </div>
+      <div class="action-content">
+        <h3>User Management</h3>
+        <p>View, search, and manage user accounts. Activate or deactivate users as needed.</p>
+        <a href="/admin/users" class="btn btn-primary">
+          <i class="fas fa-arrow-right"></i> Manage Users
+        </a>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <div class="action-icon">
+        <i class="fas fa-chart-bar"></i>
+      </div>
+      <div class="action-content">
+        <h3>System Statistics</h3>
+        <p>View detailed analytics, user activity trends, and system performance metrics.</p>
+        <button class="btn btn-secondary" onclick="loadDetailedStats()">
+          <i class="fas fa-chart-line"></i> View Analytics
+        </button>
+      </div>
+    </div>
+
+    <div class="action-card">
+      <div class="action-icon">
+        <i class="fas fa-history"></i>
+      </div>
+      <div class="action-content">
+        <h3>Recent Activity</h3>
+        <p>Monitor recent user registrations, note creation, and system activity.</p>
+        <button class="btn btn-info" onclick="showRecentActivity()">
+          <i class="fas fa-list"></i> View Activity
+        </button>
+      </div>
+    </div>
+  </div>
+
+  {{!-- Recent Activity Section --}}
+  <div class="recent-activity" style="display: none;" id="recentActivitySection">
+    <h2><i class="fas fa-history"></i> Recent Activity</h2>
+
+    <div class="activity-tabs">
+      <button class="tab-btn active" onclick="showActivityTab('users')">New Users</button>
+      <button class="tab-btn" onclick="showActivityTab('notes')">New Notes</button>
+      <button class="tab-btn" onclick="showActivityTab('logins')">Recent Logins</button>
+    </div>
+
+    <div class="activity-content">
+      <div id="usersActivity" class="activity-tab active">
+        <div class="activity-list" id="newUsersList">
+          <div class="loading">Loading recent users...</div>
+        </div>
+      </div>
+
+      <div id="notesActivity" class="activity-tab">
+        <div class="activity-list" id="newNotesList">
+          <div class="loading">Loading recent notes...</div>
+        </div>
+      </div>
+
+      <div id="loginsActivity" class="activity-tab">
+        <div class="activity-list" id="recentLoginsList">
+          <div class="loading">Loading recent logins...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{!-- Detailed Statistics Modal --}}
+  <div id="statsModal" class="modal" style="display: none;">
+    <div class="modal-overlay" onclick="closeStatsModal()"></div>
+    <div class="modal-content large">
+      <div class="modal-header">
+        <h3><i class="fas fa-chart-bar"></i> Detailed System Statistics</h3>
+        <button class="modal-close" onclick="closeStatsModal()">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="stats-detailed" id="detailedStatsContent">
+          <div class="loading">Loading detailed statistics...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{!-- Quick Stats Summary --}}
+  <div class="quick-summary">
+    <h2><i class="fas fa-tachometer-alt"></i> System Health</h2>
+    <div class="health-indicators">
+      <div class="health-item">
+        <span class="health-label">Database Status</span>
+        <span class="health-status healthy">
+          <i class="fas fa-check-circle"></i> Connected
+        </span>
+      </div>
+      <div class="health-item">
+        <span class="health-label">User Growth</span>
+        <span class="health-status {{#if (gt stats.users.newThisWeek 0)}}healthy{{else}}neutral{{/if}}">
+          <i class="fas fa-{{#if (gt stats.users.newThisWeek 0)}}arrow-up{{else}}minus{{/if}}"></i>
+          +{{stats.users.newThisWeek}} this week
+        </span>
+      </div>
+      <div class="health-item">
+        <span class="health-label">Content Activity</span>
+        <span class="health-status {{#if (gt stats.notes.createdThisWeek 0)}}healthy{{else}}neutral{{/if}}">
+          <i class="fas fa-{{#if (gt stats.notes.createdThisWeek 0)}}arrow-up{{else}}minus{{/if}}"></i>
+          +{{stats.notes.createdThisWeek}} notes this week
+        </span>
+      </div>
+      <div class="health-item">
+        <span class="health-label">Admin Users</span>
+        <span class="health-status neutral">
+          <i class="fas fa-crown"></i> {{stats.users.admins}} active
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{!-- Loading overlay --}}
+<div id="loadingOverlay" class="loading-overlay" style="display: none;">
+  <div class="loading-spinner">
+    <i class="fas fa-spinner fa-spin"></i>
+    <span>Loading...</span>
+  </div>
+</div>
+
+<!-- Admin JavaScript -->
+<script src="/js/admin.js"></script>

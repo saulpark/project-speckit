@@ -1,0 +1,292 @@
+<!-- Profile CSS -->
+<link rel="stylesheet" href="/css/profile.css">
+
+{{!-- Profile Management Page --}}
+<div class="profile-container">
+  {{!-- Page Header --}}
+  <div class="profile-header">
+    <h1><i class="fas fa-user-circle"></i> User Profile</h1>
+    <p class="profile-subtitle">Manage your account settings and preferences</p>
+  </div>
+
+  {{!-- Alert Messages --}}
+  {{#if messages.success}}
+    <div class="alert alert-success">
+      <i class="fas fa-check-circle"></i>
+      {{messages.success}}
+    </div>
+  {{/if}}
+
+  {{#if messages.error}}
+    <div class="alert alert-error">
+      <i class="fas fa-exclamation-circle"></i>
+      {{messages.error}}
+    </div>
+  {{/if}}
+
+  <div class="profile-grid">
+    {{!-- Profile Information Section --}}
+    <div class="profile-section">
+      <h2><i class="fas fa-id-card"></i> Account Information</h2>
+
+      <form id="profile-form" class="profile-form">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            value="{{profile.email}}"
+            disabled
+            class="form-input disabled"
+          >
+          <small class="form-hint">Email address cannot be changed</small>
+        </div>
+
+        <div class="form-group">
+          <label for="displayName">Display Name</label>
+          <input
+            type="text"
+            id="displayName"
+            name="displayName"
+            value="{{profile.displayName}}"
+            placeholder="Enter your display name (optional)"
+            maxlength="50"
+            class="form-input"
+          >
+          <small class="form-hint">This name will be shown in shared notes (2-50 characters, optional)</small>
+        </div>
+
+        <div class="form-group">
+          <label>Account Type</label>
+          <span class="role-badge role-{{profile.role}}">
+            {{#if (eq profile.role 'admin')}}
+              <i class="fas fa-crown"></i> Administrator
+            {{else}}
+              <i class="fas fa-user"></i> User
+            {{/if}}
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label>Member Since</label>
+          <span class="member-since">
+            <i class="fas fa-calendar-alt"></i>
+            {{formatDate profile.createdAt "MMMM D, YYYY"}}
+          </span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          <i class="fas fa-save"></i> Update Profile
+        </button>
+      </form>
+    </div>
+
+    {{!-- Statistics Section --}}
+    <div class="profile-section">
+      <h2><i class="fas fa-chart-bar"></i> Your Statistics</h2>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-sticky-note"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-number">{{stats.noteCount}}</span>
+            <span class="stat-label">Notes Created</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-share-alt"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-number">{{stats.sharedNotesCount}}</span>
+            <span class="stat-label">Shared Notes</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-globe"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-number">{{stats.publicNotesCount}}</span>
+            <span class="stat-label">Public Notes</span>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-number">
+              {{calculateDaysAgo stats.memberSince}}
+            </span>
+            <span class="stat-label">Days as Member</span>
+          </div>
+        </div>
+      </div>
+
+      {{#if profile.lastLoginAt}}
+        <div class="last-login">
+          <i class="fas fa-sign-in-alt"></i>
+          <span>Last login: {{formatDate profile.lastLoginAt "MMMM D, YYYY [at] h:mm A"}}</span>
+        </div>
+      {{/if}}
+    </div>
+  </div>
+
+  {{!-- Password Change Section --}}
+  <div class="profile-section">
+    <h2><i class="fas fa-key"></i> Change Password</h2>
+    <p class="section-description">Update your password to keep your account secure</p>
+
+    <form id="password-form" class="password-change-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="currentPassword">Current Password</label>
+          <input
+            type="password"
+            id="currentPassword"
+            name="currentPassword"
+            required
+            class="form-input"
+            autocomplete="current-password"
+          >
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="newPassword">New Password</label>
+          <input
+            type="password"
+            id="newPassword"
+            name="newPassword"
+            required
+            class="form-input"
+            autocomplete="new-password"
+          >
+          <div class="password-requirements">
+            <small>Password must contain:</small>
+            <ul class="requirements-list">
+              <li id="req-length">8+ characters</li>
+              <li id="req-uppercase">Uppercase letter</li>
+              <li id="req-lowercase">Lowercase letter</li>
+              <li id="req-number">Number</li>
+              <li id="req-special">Special character (@$!%*?&)</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="confirmPassword">Confirm New Password</label>
+          <input
+            type="password"
+            id="confirmPassword"
+            name="confirmPassword"
+            required
+            class="form-input"
+            autocomplete="new-password"
+          >
+          <div id="password-match" class="password-feedback"></div>
+        </div>
+      </div>
+
+      <div class="password-strength">
+        <label>Password Strength:</label>
+        <div class="strength-meter">
+          <div class="strength-fill" id="strength-fill"></div>
+        </div>
+        <span class="strength-text" id="strength-text">Enter password</span>
+      </div>
+
+      <button type="submit" class="btn btn-warning">
+        <i class="fas fa-key"></i> Change Password
+      </button>
+
+      <div class="password-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Note:</strong> Changing your password will log you out of all devices.
+      </div>
+    </form>
+  </div>
+
+  {{!-- Danger Zone --}}
+  <div class="profile-section danger-zone">
+    <h2><i class="fas fa-exclamation-triangle"></i> Danger Zone</h2>
+    <p class="section-description">Irreversible and destructive actions</p>
+
+    <div class="danger-content">
+      <div class="danger-info">
+        <h3>Deactivate Account</h3>
+        <p>Deactivating your account will:</p>
+        <ul>
+          <li>Log you out immediately</li>
+          <li>Prevent future logins</li>
+          <li>Keep your notes safe (not deleted)</li>
+          <li>Allow admin reactivation if needed</li>
+        </ul>
+      </div>
+
+      <button class="btn btn-danger" onclick="showDeactivateModal()">
+        <i class="fas fa-user-times"></i> Deactivate Account
+      </button>
+    </div>
+  </div>
+</div>
+
+{{!-- Account Deactivation Modal --}}
+<div id="deactivateModal" class="modal" style="display: none;">
+  <div class="modal-overlay" onclick="hideDeactivateModal()"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3><i class="fas fa-exclamation-triangle"></i> Confirm Account Deactivation</h3>
+      <button class="modal-close" onclick="hideDeactivateModal()">&times;</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="warning-box">
+        <p><strong>Warning:</strong> This action will deactivate your account.</p>
+        <p>You will be logged out immediately and won't be able to log in until an administrator reactivates your account.</p>
+      </div>
+
+      <form id="deactivate-form">
+        <div class="form-group">
+          <label for="deactivatePassword">Confirm with your password:</label>
+          <input
+            type="password"
+            id="deactivatePassword"
+            name="password"
+            required
+            class="form-input"
+            placeholder="Enter your current password"
+          >
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="hideDeactivateModal()">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+          <button type="submit" class="btn btn-danger">
+            <i class="fas fa-user-times"></i> Deactivate Account
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{{!-- Loading overlay --}}
+<div id="loadingOverlay" class="loading-overlay" style="display: none;">
+  <div class="loading-spinner">
+    <i class="fas fa-spinner fa-spin"></i>
+    <span>Processing...</span>
+  </div>
+</div>
+
+<!-- Profile JavaScript -->
+<script src="/js/profile.js"></script>

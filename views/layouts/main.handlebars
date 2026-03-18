@@ -16,14 +16,81 @@
   <!-- Stylesheets -->
   <link rel="stylesheet" href="/css/main.css">
 
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
   <!-- Additional page-specific styles -->
   {{#if additionalStyles}}
   {{{additionalStyles}}}
   {{/if}}
 </head>
 <body class="{{bodyClass}}">
+  <!-- Navigation Header -->
+  {{#if user}}
+  <header class="app-header">
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="nav-brand">
+          <a href="/dashboard" class="brand-link">
+            <i class="fas fa-sticky-note"></i>
+            <span>SpecKit</span>
+          </a>
+        </div>
+
+        <div class="nav-menu">
+          <div class="nav-links">
+            <a href="/dashboard" class="nav-link">
+              <i class="fas fa-home"></i> Dashboard
+            </a>
+            <a href="/notes" class="nav-link">
+              <i class="fas fa-sticky-note"></i> Notes
+            </a>
+            <a href="/profile" class="nav-link">
+              <i class="fas fa-user"></i> Profile
+            </a>
+
+            {{#if (eq user.role 'admin')}}
+            <div class="nav-dropdown">
+              <a href="#" class="nav-link dropdown-toggle">
+                <i class="fas fa-crown"></i> Admin <i class="fas fa-chevron-down"></i>
+              </a>
+              <div class="dropdown-menu">
+                <a href="/admin" class="dropdown-item">
+                  <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+                <a href="/admin/users" class="dropdown-item">
+                  <i class="fas fa-users-cog"></i> User Management
+                </a>
+              </div>
+            </div>
+            {{/if}}
+          </div>
+
+          <div class="nav-actions">
+            <div class="user-info">
+              <span class="user-email">{{user.email}}</span>
+              {{#if (eq user.role 'admin')}}
+              <span class="user-role admin">
+                <i class="fas fa-crown"></i> Admin
+              </span>
+              {{/if}}
+            </div>
+            <a href="/auth/logout" class="btn btn-outline">
+              <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+          </div>
+        </div>
+
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()">
+          <i class="fas fa-bars"></i>
+        </button>
+      </div>
+    </nav>
+  </header>
+  {{/if}}
+
   <!-- Main Content -->
-  <main role="main">
+  <main role="main" class="{{#if user}}with-header{{/if}}">
     {{{body}}}
   </main>
 

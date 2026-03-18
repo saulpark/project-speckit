@@ -9,6 +9,8 @@ import path from 'path';
 import { database } from './config/database';
 import authRoutes from './routes/authRoutes';
 import noteRoutes from './routes/noteRoutes';
+import profileRoutes from './routes/profileRoutes';
+import adminRoutes from './routes/adminRoutes';
 import testEditRoutes from './routes/testEditRoutes';
 import { NoteController } from './controllers/noteController';
 import { authenticateWeb } from './middleware/auth';
@@ -89,6 +91,10 @@ app.engine('handlebars', engine({
     // Custom template helpers
     eq: (a: any, b: any) => a === b,
     ne: (a: any, b: any) => a !== b,
+    gt: (a: any, b: any) => a > b,
+    lt: (a: any, b: any) => a < b,
+    gte: (a: any, b: any) => a >= b,
+    lte: (a: any, b: any) => a <= b,
     json: (context: any) => JSON.stringify(context),
     formatDate: (date: any, options?: any) => {
       // Ignore the options parameter that Handlebars passes
@@ -107,6 +113,29 @@ app.engine('handlebars', engine({
         return date.toLocaleDateString();
       }
       return 'Invalid date';
+    },
+    calculateDaysAgo: (date: any) => {
+      if (!date) return 0;
+      let targetDate: Date;
+
+      if (typeof date === 'string') {
+        try {
+          targetDate = new Date(date);
+          if (isNaN(targetDate.getTime())) return 0;
+        } catch (e) {
+          return 0;
+        }
+      } else if (date instanceof Date) {
+        if (isNaN(date.getTime())) return 0;
+        targetDate = date;
+      } else {
+        return 0;
+      }
+
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - targetDate.getTime());
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays;
     },
     capitalize: (str: string) => str.charAt(0).toUpperCase() + str.slice(1)
   }
@@ -130,6 +159,12 @@ app.use((req, res, next) => {
 
 // Authentication routes
 app.use('/auth', authRoutes);
+
+// Profile management routes
+app.use('/profile', profileRoutes);
+
+// Admin management routes
+app.use('/admin', adminRoutes);
 
 // Public note access (no authentication required, but rate limited)
 app.get('/public/notes/:id', NoteController.getPublicNoteView);

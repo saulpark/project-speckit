@@ -23,26 +23,37 @@ src/
 ├── config/
 │   └── database.ts                # MongoDB connect/disconnect/healthCheck
 ├── models/
-│   ├── User.ts                    # IUser, IUserModel, userSchema
+│   ├── User.ts                    # IUser, IUserModel, userSchema (includes role, displayName, lastLoginAt, passwordChangedAt, deactivatedAt)
 │   └── Note.ts                    # INote, INoteContent, ISharedUser, noteSchema
 ├── controllers/
 │   ├── authController.ts          # register, login, logout, getProfile, getAuthStats, requestPasswordReset, resetPassword
-│   └── noteController.ts          # getNotesView, listNotes, createNote, getNote, updateNote, deleteNote,
-│                                  # getSharedNotesView, getCreateForm, getEditForm, getShowView,
-│                                  # togglePublicSharing, getPublicNote, shareNoteWithUser,
-│                                  # unshareNoteWithUser, getSharedNotes, getNoteSharingInfo
+│   ├── noteController.ts          # getNotesView, listNotes, createNote, getNote, updateNote, deleteNote,
+│   │                              # getSharedNotesView, getCreateForm, getEditForm, getShowView,
+│   │                              # togglePublicSharing, getPublicNote, shareNoteWithUser,
+│   │                              # unshareNoteWithUser, getSharedNotes, getNoteSharingInfo
+│   ├── profileController.ts       # getProfileView, getProfile, getStats, updateProfile, changePassword
+│   └── adminController.ts         # getDashboard, getUsersView, getUsers, toggleUserStatus,
+│                                  # getUserDetails, getSystemStats, searchUsers, getRecentActivity
 ├── services/
 │   ├── authService.ts             # registerUser, loginUser, getUserById
 │   ├── noteService.ts             # createNote, getUserNotes, getNoteById, updateNote, deleteNote,
 │   │                              # shareNotePublic, unshareNotePublic, shareNoteWithUser,
 │   │                              # unshareNoteWithUser, getSharedNotes, getNoteWithSharingAccess, getPublicNote
-│   ├── tokenBlacklistService.ts   # In-memory JWT blacklist: add, isBlacklisted, cleanup, getStats
-│   └── userService.ts             # findUserByEmail, findUserById, validateUserForSharing,
-│                                  # findUsersByEmails, getUserSharingDisplayInfo
+│   ├── tokenBlacklistService.ts   # In-memory JWT blacklist: add, isBlacklisted, cleanup, getStats, blacklistAllUserTokens
+│   ├── userService.ts             # findUserByEmail, findUserById, validateUserForSharing,
+│   │                              # findUsersByEmails, getUserSharingDisplayInfo,
+│   │                              # getProfile, updateProfile, getUserStats, changePassword
+│   └── adminService.ts            # getAllUsers, getSystemStats, toggleUserStatus,
+│                                  # getUserWithStats, searchUsers, getRecentActivity
+│                                  # Exports: PaginatedUsers, UserWithStats, SystemStats
 ├── middleware/
 │   ├── auth.ts                    # authenticateToken (cookie + header), authenticateWeb, optionalAuthentication
+│   ├── adminAuth.ts               # requireAdmin (JSON API), requireAdminWeb (HTML), optionalAdmin
 │   ├── noteOwnership.ts           # verifyNoteOwnership (owner-only), verifyNoteAccessOrShared (owner or shared)
 │   ├── noteValidation.ts          # validateNote, validateNoteUpdate (express-validator chains)
+│   ├── profileValidation.ts       # validateProfileUpdate, validatePasswordChange, handleProfileUpdate,
+│   │                              # handlePasswordChange, sanitizeProfileInput, validateRateLimit,
+│   │                              # calculatePasswordStrength
 │   ├── validation.ts              # validateRegistration, validateLogin, validatePasswordResetRequest,
 │   │                              # handleValidationErrors, sanitizeInput
 │   ├── security.ts                # CSRFProtection, securityHeaders, securityLogger, IPBlacklist, requestSizeLimit
@@ -50,6 +61,8 @@ src/
 ├── routes/
 │   ├── authRoutes.ts              # /auth/* route definitions
 │   ├── noteRoutes.ts              # /notes/* and /public/notes/* route definitions
+│   ├── profileRoutes.ts           # /profile/* route definitions; rate limits: 30/15min general, 3/15min password
+│   ├── adminRoutes.ts             # /admin/* route definitions; rate limits: 50/5min general, 10/1min status changes
 │   └── testEditRoutes.ts          # Debug routes (dev only — should not reach production)
 └── utils/
     ├── jwt.ts                     # JWTUtils: generateToken, verifyToken, extractFromHeader
@@ -69,6 +82,11 @@ views/
 │   ├── login.handlebars
 │   └── register.handlebars
 ├── dashboard.handlebars           # Post-login dashboard
+├── profile/
+│   └── index.handlebars           # Profile management: display name form, password change form, user stats panel
+├── admin/
+│   ├── dashboard.handlebars       # Admin dashboard: stats cards (users/notes/activity), recent activity list
+│   └── users.handlebars           # User management: search input, status/role filters, JS-loaded table, pagination
 └── notes/
     ├── list.handlebars            # Paginated note cards; shows sharing badges (isPublic, sharedWith count)
     ├── fresh-view.handlebars      # Active single note view; renders Quill Delta to HTML; includes sharing panel and modal for owners
@@ -82,13 +100,19 @@ views/
 ```typescript
 {
   _id: ObjectId,
-  email: string,          // unique, indexed, lowercase
-  passwordHash: string,   // bcrypt hash, excluded from default queries
-  isActive: boolean,      // default: true; indexed
+  email: string,              // unique, indexed, lowercase
+  passwordHash: string,       // bcrypt hash, excluded from default queries
+  isActive: boolean,          // default: true; indexed
+  displayName: string | null, // optional, max 50 chars, trimmed; default null
+  role: 'user' | 'admin',    // default: 'user'; indexed
+  passwordChangedAt: Date | null, // set on password change; used for token invalidation
+  deactivatedAt: Date | null, // set when admin deactivates an account
+  lastLoginAt: Date | null,   // updated on each successful login
   createdAt: Date,
   updatedAt: Date
 }
 ```
+Indexes: `{ email, isActive }`, `{ role }`, `{ isActive, createdAt: -1 }`, `{ email, role }`
 
 ### Note
 ```typescript
@@ -136,6 +160,19 @@ Indexes: `{ userId, updatedAt }`, `{ userId, title: text, content.preview: text 
 - **Public access**: `GET /public/notes/:id` bypasses authentication entirely, serves only notes with `isPublic: true`.
 - **Sharing revocation**: Deleting a note removes all sharing records automatically (document deletion). Individual user access revocation via `unshareNoteWithUser`.
 
+### Profile and Password Management
+- **Profile Route**: `GET /profile` renders `views/profile/index.handlebars` with user data and note statistics fetched in parallel from `UserService`.
+- **Password Change Flow**: `POST /profile/change-password` verifies current password via bcrypt, hashes the new password, updates `passwordChangedAt`, then calls `TokenBlacklistService.blacklistAllUserTokens(userId)` to invalidate all active sessions immediately.
+- **Password Validation**: `profileValidation.ts` enforces min 8 chars, uppercase, lowercase, digit, special char; blocks common weak patterns; blocks new password equal to current password.
+- **Input Sanitization**: `sanitizeProfileInput` strips HTML tags, normalizes whitespace, and allows only the fields `displayName | currentPassword | newPassword | confirmPassword | password` in `req.body`.
+
+### Admin Authorization Design
+- **Two middleware variants**: `requireAdmin` for JSON API routes (returns 401/403 JSON); `requireAdminWeb` for HTML routes (redirects to login with `returnTo` parameter on unauthenticated, renders `error` view on insufficient privileges).
+- **`optionalAdmin`**: Sets `req.isAdmin` boolean flag without blocking access; usable on shared pages that display extra UI for admins.
+- **Self-modification guard**: `AdminService.toggleUserStatus` throws `'Cannot modify your own account status'` when `adminId === targetUserId`, and throws `'Cannot deactivate admin users'` when the target user has `role === 'admin'` and `isActive === true`.
+- **No self-promotion**: There is no API endpoint to promote a user to admin; the `role` field must be set directly in the database.
+- **Admin rate limiting**: General admin API routes: 50 requests per 5 minutes (read-only dashboard/stats excluded). User status change endpoint: 10 requests per 1 minute.
+
 ### Security Measures
 - **CORS**: Disabled in production (`origin: false`), permissive in development
 - **Helmet**: Imported but CSP currently disabled pending Quill.js compatibility fix (see `AUDIT.md`)
@@ -159,7 +196,10 @@ Indexes: `{ userId, updatedAt }`, `{ userId, title: text, content.preview: text 
 | 003 | Notes CRUD | `src/controllers/noteController.ts`, `src/services/noteService.ts`, `src/models/Note.ts` |
 | 004 | Note Sharing (backend) | `NoteService` sharing methods, `verifyNoteAccessOrShared`, `src/services/userService.ts` |
 | 004 | Note Sharing (UI) | `views/notes/fresh-view.handlebars` (sharing panel, toggle public, modal for user sharing, revoke); `views/notes/public-view.handlebars` (unauthenticated view); `views/notes/list.handlebars` (sharing badges) |
-| 005 | User Management | Draft only — not started |
+| 005 | User Management — Phase 1: Profile | `src/controllers/profileController.ts`, `src/services/userService.ts` (extended), `src/middleware/profileValidation.ts`, `src/routes/profileRoutes.ts`, `views/profile/index.handlebars` |
+| 005 | User Management — Phase 2: Password Change | `ProfileController.changePassword`, `UserService.changePassword`, `TokenBlacklistService.blacklistAllUserTokens`, password validation in `profileValidation.ts` |
+| 005 | User Management — Phase 3: Admin Interface | `src/controllers/adminController.ts`, `src/services/adminService.ts`, `src/middleware/adminAuth.ts`, `src/routes/adminRoutes.ts`, `views/admin/dashboard.handlebars`, `views/admin/users.handlebars` |
+| 005 | User Management — Phase 4: Testing | Not yet implemented — unit and integration tests pending |
 
 ## Development Guidelines
 
@@ -194,6 +234,14 @@ Indexes: `{ userId, updatedAt }`, `{ userId, title: text, content.preview: text 
 - Anti-cache headers on all responses (development mode convenience)
 
 ## Change Log
+
+### 2026-03-19
+- Spec 005 Phase 3 (Admin Interface) implemented: `AdminController`, `AdminService`, `adminAuth.ts` middleware (`requireAdmin`, `requireAdminWeb`, `optionalAdmin`), `adminRoutes.ts`, `views/admin/dashboard.handlebars`, `views/admin/users.handlebars`
+- Spec 005 Phase 1 (Profile Management) implemented: `ProfileController`, `UserService` extended with profile/stats/password methods, `profileValidation.ts`, `profileRoutes.ts`, `views/profile/index.handlebars`
+- Spec 005 Phase 2 (Password Change) implemented: `ProfileController.changePassword`, `UserService.changePassword`, `TokenBlacklistService.blacklistAllUserTokens` for full session invalidation on password change
+- `User.ts` model extended: added `displayName`, `role` (user|admin), `passwordChangedAt`, `deactivatedAt`, `lastLoginAt` fields and four new compound indexes
+- `src/server.ts` updated to register `profileRoutes` at `/profile` and `adminRoutes` at `/admin`
+- `SystemStats`, `PaginatedUsers`, `UserWithStats` interfaces defined in `adminService.ts`
 
 ### 2026-03-18
 - Spec 004 frontend UI complete: sharing panel and modal added to `fresh-view.handlebars` (toggle public sharing, copy public URL, share by email, revoke user access)

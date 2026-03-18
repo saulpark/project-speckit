@@ -19,6 +19,12 @@ This document tracks security issues, code quality concerns, and their resolutio
 
 - [ ] **Environment Variable Handling** — `JWT_SECRET` and `MONGODB_URI` have no validation at startup. If absent, the app will fail in a non-obvious way. Startup should validate required environment variables.
 
+- [ ] **Admin Self-Modification Guard Is Partial** — `AdminService.toggleUserStatus` prevents an admin from toggling their own status and prevents deactivating other admins while active. However, re-activating a deactivated admin user is currently permitted. The guard logic on line 287 of `adminService.ts` allows toggling an inactive admin to active. Review whether this is intentional.
+
+- [ ] **Database Migration Script Missing** — Spec 005 tasks specify a migration script (`scripts/migrations/add-user-management-fields.js`) to backfill `role: 'user'`, `displayName: null`, `passwordChangedAt: null`, and `lastLoginAt: null` on all existing user documents. This script has not been created. Existing users in the database lack these fields, which could cause `role === undefined` checks in `requireAdmin` to pass incorrectly if Mongoose defaults are not applied retroactively.
+
+- [ ] **Admin Seeding Mechanism Missing** — There is no documented way to create the first admin user. The spec 005 tasks reference a `scripts/migrations/seed-admin-user.js` script that was not created. Admins must currently be created by manually setting `role: 'admin'` in MongoDB.
+
 ### Code Quality
 
 - [ ] **Note Creation Uses `optionalAuthentication`** — `POST /notes` in `src/routes/noteRoutes.ts` uses `optionalAuthentication` with a manual user check instead of `authenticateToken`. This is a leftover from debugging and should be reverted to standard `authenticateToken` middleware.
@@ -27,9 +33,11 @@ This document tracks security issues, code quality concerns, and their resolutio
 
 - [ ] **`testEditRoutes.ts` Registered in Production** — `src/routes/testEditRoutes.ts` is imported and registered at `/test` unconditionally. Should be removed or gated for production.
 
-- [ ] **`console.log` in Controllers** — `noteController.ts` `getCreateForm` and `getEditForm` methods contain `console.log` debug statements that should be removed or replaced with a logger.
+- [ ] **`console.log` in Controllers** — `noteController.ts` `getCreateForm` and `getEditForm` methods contain `console.log` debug statements that should be removed or replaced with a logger. `adminController.ts` also uses `console.log` for all admin access events; both should migrate to a structured logger before production.
 
-- [ ] **Increase Test Coverage** — Current test files in `src/utils/` are standalone test scripts, not Jest tests. Actual Jest test coverage for the notes system and sharing service is not yet written.
+- [ ] **`adminService.ts` Uses `any` Type** — `AdminService.toggleUserStatus` return type includes `user: any`. Strict TypeScript mode is a project requirement. This should be typed with a proper DTO interface.
+
+- [ ] **Increase Test Coverage** — Current test files in `src/utils/` are standalone test scripts, not Jest tests. Actual Jest test coverage for the notes system, sharing service, profile management, and admin system is not yet written. Spec 005 Phase 4 tests (`tests/unit/services/userService.test.ts`, `tests/unit/services/adminService.test.ts`, `tests/integration/profile-api.test.ts`, `tests/integration/admin-api.test.ts`) remain unimplemented.
 
 ### Performance
 
@@ -38,6 +46,12 @@ This document tracks security issues, code quality concerns, and their resolutio
 - [ ] **Profile and Optimize Database Connections** — No connection pool configuration set in `database.ts`.
 
 ## Resolved Issues
+
+### 2026-03-19
+- [x] **User Management — Phase 3 Admin Interface** — Admin dashboard (`views/admin/dashboard.handlebars`), user management page (`views/admin/users.handlebars`), `AdminController`, `AdminService`, `src/middleware/adminAuth.ts` (`requireAdmin`, `requireAdminWeb`, `optionalAdmin`), and `src/routes/adminRoutes.ts` fully implemented. Rate limiting applied: 50 admin actions per 5 minutes; 10 user status changes per minute.
+- [x] **User Management — Phase 1 Profile Management** — `ProfileController`, `UserService` extended with `getProfile`/`updateProfile`/`getUserStats`/`changePassword`, `src/middleware/profileValidation.ts`, `src/routes/profileRoutes.ts`, and `views/profile/index.handlebars` implemented.
+- [x] **User Management — Phase 2 Password Change** — Password change via `POST /profile/change-password` implemented with current password verification, bcrypt re-hash, `passwordChangedAt` timestamp update, and `TokenBlacklistService.blacklistAllUserTokens()` call to immediately invalidate all sessions.
+- [x] **User Model Extended** — `src/models/User.ts` extended with `displayName`, `role` (`user` | `admin`), `passwordChangedAt`, `deactivatedAt`, `lastLoginAt` fields plus compound indexes (`email + isActive`, `role`, `isActive + createdAt`, `email + role`).
 
 ### 2026-03-18
 - [x] **Note Sharing UI — Phase 4 Complete** — `fresh-view.handlebars` now includes the full sharing panel (public link toggle, copy URL, user email input, revoke buttons) and sharing modal. `public-view.handlebars` created for unauthenticated public note access. Logout and main-menu navigation buttons added to the note view action bar.

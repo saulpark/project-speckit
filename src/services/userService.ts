@@ -1,4 +1,6 @@
 import { User, IUser } from '../models/User';
+import bcrypt from 'bcrypt';
+import { Note } from '../models/Note';
 
 /**
  * Custom error types for user operations
@@ -23,6 +25,54 @@ export interface UserSharingInfo {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * User profile data transfer objects
+ */
+export interface UserProfileData {
+  id: string;
+  email: string;
+  displayName: string | null;
+  role: 'user' | 'admin';
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  lastLoginAt: Date | null;
+}
+
+export interface UserStatsData {
+  noteCount: number;
+  sharedNotesCount: number;
+  publicNotesCount: number;
+  memberSince: Date;
+}
+
+export interface ProfileUpdateData {
+  displayName?: string;
+}
+
+export interface PaginatedUsers {
+  users: UserWithStats[];
+  totalCount: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface UserWithStats extends UserProfileData {
+  noteCount: number;
+  lastPasswordChange: Date | null;
+}
+
+export interface SystemStats {
+  totalUsers: number;
+  activeUsers: number;
+  inactiveUsers: number;
+  adminUsers: number;
+  totalNotes: number;
+  publicNotes: number;
+  sharedNotes: number;
 }
 
 /**
@@ -201,6 +251,259 @@ export class UserService {
         'USER_SHARING_INFO_ERROR',
         500
       );
+    }
+  }
+
+  // =============================================
+  // PROFILE MANAGEMENT METHODS
+  // =============================================
+
+  /**
+   * Get user profile with complete information
+   */
+  static async getProfile(userId: string): Promise<UserProfileData> {
+    try {
+      const user = await User.findById(userId).select('email displayName role isActive createdAt updatedAt lastLoginAt');
+
+      if (!user) {
+        throw new UserError(
+          'User not found',
+          'USER_NOT_FOUND',
+          404
+        );
+      }
+
+      return {
+        id: user._id.toString(),
+        email: user.email,
+        displayName: user.displayName || null,
+        role: user.role,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        lastLoginAt: user.lastLoginAt || null,
+      };
+
+    } catch (error) {
+      if (error instanceof UserError) {
+        throw error;
+      }
+      throw new UserError(
+        'Error occurred while retrieving user profile',
+        'PROFILE_FETCH_ERROR',
+        500
+      );
+    }
+  }
+
+  /**
+   * Update user profile information
+   */
+  static async updateProfile(userId: string, data: ProfileUpdateData): Promise<void> {
+    try {
+      // Validate display name if provided
+      if (data.displayName !== undefined) {
+        if (data.displayName && data.displayName.length > 50) {
+          throw new UserError(
+            'Display name cannot exceed 50 characters',
+            'INVALID_DISPLAY_NAME',
+            400
+          );
+        }
+      }
+
+      const updateData: any = {
+        updatedAt: new Date()
+      };
+
+      if (data.displayName !== undefined) {
+        updateData.displayName = data.displayName?.trim() || null;
+      }
+
+      const result = await User.findByIdAndUpdate(
+        userId,
+        { $set: updateData },
+        { new: true }
+      );
+
+      if (!result) {
+        throw new UserError(
+          'User not found',
+          'USER_NOT_FOUND',
+          404
+        );
+      }
+
+    } catch (error) {
+      if (error instanceof UserError) {
+        throw error;
+      }
+      throw new UserError(
+        'Error occurred while updating profile',
+        'PROFILE_UPDATE_ERROR',
+        500
+      );
+    }
+  }
+
+  /**
+   * Get user statistics (note counts, etc.)
+   */
+  static async getUserStats(userId: string): Promise<UserStatsData> {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw new UserError(
+          'User not found',
+          'USER_NOT_FOUND',
+          404
+        );
+      }
+
+      // Get note counts using aggregation for better performance
+      const [stats] = await Note.aggregate([
+        { $match: { userId: user._id } },
+        {
+          $group: {
+            _id: null,
+            noteCount: { $sum: 1 },
+            publicNotesCount: {
+              $sum: { $cond: [{ $eq: ['$isPublic', true] }, 1, 0] }
+            },
+            sharedNotesCount: {
+              $sum: { $cond: [{ $gt: [{ $size: { $ifNull: ['$sharedWith', []] } }, 0] }, 1, 0] }
+            }
+          }
+        }
+      ]);
+
+      return {
+        noteCount: stats?.noteCount || 0,
+        sharedNotesCount: stats?.sharedNotesCount || 0,
+        publicNotesCount: stats?.publicNotesCount || 0,
+        memberSince: user.createdAt
+      };
+
+    } catch (error) {
+      if (error instanceof UserError) {
+        throw error;
+      }
+      throw new UserError(
+        'Error occurred while retrieving user statistics',
+        'STATS_FETCH_ERROR',
+        500
+      );
+    }
+  }
+
+  // =============================================
+  // PASSWORD MANAGEMENT METHODS
+  // =============================================
+
+  /**
+   * Change user password with current password verification
+   */
+  static async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void> {
+    try {
+      // Get user with password hash
+      const user = await User.findById(userId).select('+passwordHash');
+      if (!user) {
+        throw new UserError(
+          'User not found',
+          'USER_NOT_FOUND',
+          404
+        );
+      }
+
+      // Verify current password
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isCurrentPasswordValid) {
+        throw new UserError(
+          'Current password is incorrect',
+          'INVALID_CURRENT_PASSWORD',
+          400
+        );
+      }
+
+      // Hash new password
+      const saltRounds = 12;
+      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+
+      // Update password and timestamp
+      await User.findByIdAndUpdate(userId, {
+        $set: {
+          passwordHash: newPasswordHash,
+          passwordChangedAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+
+      // Note: Token invalidation should be handled by the calling controller
+      // to ensure proper coordination with TokenBlacklistService
+
+    } catch (error) {
+      if (error instanceof UserError) {
+        throw error;
+      }
+      throw new UserError(
+        'Error occurred while changing password',
+        'PASSWORD_CHANGE_ERROR',
+        500
+      );
+    }
+  }
+
+  /**
+   * Verify current password for sensitive operations
+   */
+  static async verifyCurrentPassword(userId: string, password: string): Promise<boolean> {
+    try {
+      const user = await User.findById(userId).select('+passwordHash');
+      if (!user) {
+        return false;
+      }
+
+      return await bcrypt.compare(password, user.passwordHash);
+
+    } catch (error) {
+      return false;
+    }
+  }
+
+
+  // =============================================
+  // ADMIN HELPER METHODS
+  // =============================================
+
+  /**
+   * Get users by role (for admin interface)
+   */
+  static async getUsersByRole(role: 'user' | 'admin'): Promise<IUser[]> {
+    try {
+      return await User.find({ role }).select('email displayName role isActive createdAt updatedAt lastLoginAt');
+    } catch (error) {
+      throw new UserError(
+        'Error occurred while retrieving users by role',
+        'USERS_BY_ROLE_ERROR',
+        500
+      );
+    }
+  }
+
+  /**
+   * Update last login timestamp
+   */
+  static async updateLastLogin(userId: string): Promise<void> {
+    try {
+      await User.findByIdAndUpdate(userId, {
+        $set: {
+          lastLoginAt: new Date(),
+          updatedAt: new Date()
+        }
+      });
+    } catch (error) {
+      // Log error but don't throw - login should still succeed
+      console.error('Failed to update last login timestamp:', error);
     }
   }
 }
