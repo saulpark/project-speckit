@@ -4,7 +4,7 @@
 This is a Node.js/TypeScript note-taking application with JWT authentication, rich text note CRUD, and note sharing features. Backend is MongoDB with Mongoose ODM. Templating uses Handlebars with Quill.js for rich text editing.
 
 ## Spec-Kit Methodology
-All features follow Spec-Driven Development. The authoritative source of truth for feature requirements, plans, and task status is the `.specify/` directory. Root-level `.md` files must stay in sync with `.specify/` contents.
+All features follow Spec-Driven Development. The authoritative source of truth for feature requirements, plans, and task status is the `.specify/` directory.
 
 ## Architecture
 ```
