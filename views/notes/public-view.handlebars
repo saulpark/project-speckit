@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{title}}</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .public-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #e8f5e8;
+            color: #2e7d2e;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+        .note-title {
+            font-size: 2rem;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            color: #333;
+        }
+        .note-content {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: #444;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+            margin-bottom: 30px;
+        }
+        .note-content h1, .note-content h2, .note-content h3 {
+            margin-top: 0;
+        }
+        .note-content p {
+            margin: 0 0 1em 0;
+        }
+        .note-content p:last-child {
+            margin-bottom: 0;
+        }
+        .note-content ul, .note-content ol {
+            padding-left: 1.5em;
+        }
+        .note-content strong {
+            font-weight: 600;
+        }
+        .note-content em {
+            font-style: italic;
+        }
+        .note-meta {
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            font-size: 14px;
+            color: #666;
+            display: flex;
+            gap: 30px;
+        }
+        .powered-by {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+        .powered-by a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .powered-by a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="public-badge">
+                🌐 Public Note
+            </div>
+            <div class="actions">
+                <a href="/" class="btn btn-primary">🏠 Visit App</a>
+            </div>
+        </div>
+
+        <h1 class="note-title">{{note.title}}</h1>
+
+        <div class="note-content">
+            {{{htmlContent}}}
+        </div>
+
+        <div class="note-meta">
+            <div><strong>Created:</strong> {{note.createdAt}}</div>
+            <div><strong>Last Updated:</strong> {{note.updatedAt}}</div>
+        </div>
+
+        <div class="powered-by">
+            Shared via <a href="/">SpecKit Notes</a>
+        </div>
+    </div>
+</body>
+</html>

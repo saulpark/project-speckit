@@ -1,111 +1,166 @@
 # Project SpecKit
 
 ## Overview
-Authentication system implementation using Node.js, TypeScript, and MongoDB, following the **official GitHub Spec-Kit methodology** for Spec-Driven Development.
+A Node.js/TypeScript note-taking application with JWT authentication, rich text note management, and note sharing capabilities, built following the **Spec-Kit methodology** for Spec-Driven Development.
 
-## Spec-Kit Workflow for New Joiners
+## Implemented Features
 
-This project follows the official **Spec-Kit methodology** for structured development. Here's the proper workflow order:
+| Feature | Spec | Status |
+|---------|------|--------|
+| User registration and login | 001-authentication | Complete |
+| JWT cookie-based authentication | 001-authentication | Complete |
+| Server-side token blacklisting on logout | 002-logout-enhancement | Complete |
+| Notes CRUD with rich text (Quill.js) | 003-notes-crud | Complete |
+| Note ownership enforcement | 003-notes-crud | Complete |
+| Public link sharing (toggle isPublic) | 004-note-sharing | Complete |
+| User-to-user note sharing via email | 004-note-sharing | Complete |
+| "Shared with me" notes view | 004-note-sharing | Complete |
+| Sharing access control middleware | 004-note-sharing | Complete |
+| Sharing UI (modal, public link copy, user management) | 004-note-sharing | Complete |
+| Public note view (unauthenticated, clean template) | 004-note-sharing | Complete |
 
-### 🎯 Step 1: Constitution
-**Purpose**: Establish project governing principles and development guidelines
+## Spec-Kit Workflow
+
+This project follows the **Spec-Kit methodology** for structured development:
+
+### Step 1: Constitution
 ```bash
 claude SpecKit constitution
 ```
-**Output**: `.specify/constitution.md` - Project principles and non-negotiable standards
+Output: `.specify/constitution.md`
 
-### 📋 Step 2: Specify (Requirements)
-**Purpose**: Define what you want to build (the "what" and "why")
+### Step 2: Specify (Requirements)
 ```bash
 claude SpecKit specify "Feature description here"
 ```
-**Output**: `.specify/specs/XXX-feature-name.md` - Feature specification with user stories, requirements, and acceptance criteria
+Output: `.specify/specs/XXX-feature-name/spec.md`
 
-### 🏗️ Step 3: Plan (Technical Design)
-**Purpose**: Create technical implementation strategies (the "how")
+### Step 3: Plan (Technical Design)
 ```bash
-claude SpecKit plan XXX-feature-name.md
+claude SpecKit plan .specify/specs/XXX-feature-name/spec.md
 ```
-**Output**: `.specify/plans/XXX-feature-name-plan.md` - Technical architecture, components, and implementation approach
+Output: `.specify/specs/XXX-feature-name/plan.md`
 
-### ✅ Step 4: Tasks (Action Items)
-**Purpose**: Break implementation into actionable items
+### Step 4: Tasks (Action Items)
 ```bash
-claude SpecKit tasks XXX-feature-name-plan.md
+claude SpecKit tasks .specify/specs/XXX-feature-name/plan.md
 ```
-**Output**: `.specify/tasks/XXX-feature-name-tasks.md` - Detailed task breakdown with dependencies and timelines
+Output: `.specify/specs/XXX-feature-name/tasks.md`
 
-### 🔨 Step 5: Implement (Development)
-**Purpose**: Execute tasks systematically
+### Step 5: Implement (Development)
 ```bash
-claude SpecKit implement XXX-feature-name-tasks.md
+claude SpecKit implement .specify/specs/XXX-feature-name/tasks.md
 ```
-**Output**: Working code following the specifications and plan
 
-## 🗂️ Spec-Kit File Structure
+## Spec-Kit File Structure
 ```
 .specify/
-├── constitution.md          # Project principles
-├── specs/                  # Feature specifications
-│   ├── 001-authentication.md
-│   ├── 002-logout-enhancement.md
-│   └── ...
-├── plans/                  # Implementation plans
-│   └── ...
-├── tasks/                  # Task breakdowns
-│   └── ...
-└── artifacts/              # Generated artifacts
+├── constitution.md              # Project governing principles
+├── memory/
+│   ├── constitution.md          # Constitution memory copy
+│   └── technical-requirements.md
+├── templates/
+│   └── spec-template.md
+└── specs/
+    ├── 001-authentication/      # Complete
+    ├── 002-logout-enhancement/  # Complete
+    ├── 003-notes-crud/          # Complete
+    ├── 004-note-sharing/        # Complete
+    └── 005-user-management/     # Draft
 ```
 
-## 📖 Additional Commands
-- `claude SpecKit analyze` - Check consistency across artifacts
-- `claude SpecKit checklist` - Quality validation checklist
-
-## ⚡ Quick Start for New Features
-1. **Always start with Constitution** (if not already created)
-2. **Specify the feature** - What do you want to build?
-3. **Plan the implementation** - How will you build it?
-4. **Break into tasks** - What are the actionable steps?
-5. **Implement systematically** - Follow the task list
-
-## 🚨 Important Notes
-- **Never skip steps** - Each phase builds on the previous one
-- **Follow the order** - Constitution → Specify → Plan → Tasks → Implement
-- **Document everything** - All artifacts are versioned and tracked
-- **Quality gates** - Each step has acceptance criteria
-
-## Current Features
-- User registration and login
-- JWT token-based authentication
-- Password security with bcrypt
-- MongoDB integration with Mongoose
-- TypeScript compilation
-- Comprehensive security middleware
-
 ## Setup
+
+### Requirements
+- Node.js 22+
+- Docker and Docker Compose (for MongoDB)
+
+### Local Development
 1. Install dependencies: `npm install`
-2. Start MongoDB: `docker-compose up -d`
-3. Build project: `npm run build`
-4. Start development server: `npm run dev`
+2. Copy environment file: `cp .env.example .env` and fill in values
+3. Start MongoDB: `docker-compose up -d mongo`
+4. Build and start development server: `npm run dev`
+
+### Full Docker Stack
+```bash
+# Build and start all services (required after code changes)
+docker-compose down && docker-compose up --build -d
+```
+
+Note: Use the full `down`/`up --build` cycle — `docker-compose restart` alone does not pick up new builds.
+
+### Build
+```bash
+npm run build    # Compile TypeScript
+npm run dev      # Development server with hot reload
+npm run start    # Production server
+npm run test     # Run test suite
+npm run lint     # Lint TypeScript files
+```
 
 ## API Endpoints
-- POST `/auth/register` - User registration
-- POST `/auth/login` - User authentication
-- POST `/auth/logout` - User logout
-- GET `/auth/me` - Get current user
-- GET `/auth/profile` - Get user profile
-- GET `/auth/stats` - Authentication statistics
+
+### Authentication (`/auth`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/auth/register` | Public | Register new user |
+| POST | `/auth/login` | Public | Login, sets auth cookie |
+| POST | `/auth/logout` | Public | Logout, blacklists token |
+| GET | `/auth/me` | Optional | Current user info |
+| GET | `/auth/profile` | Required | User profile |
+| GET | `/auth/stats` | Required | Auth statistics |
+| POST | `/auth/check-email` | Public | Email availability check |
+| POST | `/auth/reset-password-request` | Public | Request password reset |
+| POST | `/auth/reset-password` | Public | Reset password with token |
+| GET | `/auth/health` | Public | Auth service health |
+| GET | `/auth/admin/status` | Required | Admin system status |
+
+### UI Routes (`/auth`)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/auth/login` | Login page |
+| GET | `/auth/register` | Registration page |
+| GET | `/auth/dashboard` | Dashboard (protected) |
+
+### Notes (`/notes`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/notes` | Required | Notes list view |
+| GET | `/notes/new` | Required | Create note form |
+| GET | `/notes/shared-with-me` | Required | Shared notes view |
+| GET | `/notes/:id/view` | Required | View note (owner or shared user) |
+| GET | `/notes/:id/edit` | Required | Edit note form (owner only) |
+| GET | `/notes/api` | Required | List notes (JSON) |
+| POST | `/notes` | Required | Create note |
+| GET | `/notes/:id` | Required | Get note (owner or shared) |
+| PUT | `/notes/:id` | Required | Update note (owner only) |
+| DELETE | `/notes/:id` | Required | Delete note (owner only) |
+
+### Note Sharing (`/notes`)
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/notes/:id/share/public` | Required | Toggle public link sharing |
+| POST | `/notes/:id/share/user` | Required | Share with user by email |
+| DELETE | `/notes/:id/share/user/:userId` | Required | Revoke user access |
+| GET | `/notes/api/shared-with-me` | Required | Shared notes (JSON) |
+| GET | `/notes/:id/sharing` | Required | Note sharing details |
+
+### Public Access
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/public/notes/:id` | None | Read public note |
+| GET | `/health` | None | Application health check |
 
 ## Environment Variables
-- `MONGODB_URI` - MongoDB connection string
-- `JWT_SECRET` - JWT signing secret
-- `PORT` - Server port (default: 3000)
-- `NODE_ENV` - Environment mode
-
-## Development
-- `npm run dev` - Start development server
-- `npm run build` - Build TypeScript
-- `npm run start` - Start production server
+```env
+MONGODB_URI=mongodb://localhost:27017/speckit
+JWT_SECRET=your-jwt-secret-key
+JWT_EXPIRES_IN=24h
+PORT=3000
+NODE_ENV=development
+PUBLIC_NOTE_BASE_URL=http://localhost:3000
+NOTE_SHARING_RATE_LIMIT=10
+```
 
 ## Architecture
-Built with modern Node.js stack focusing on security and scalability, following Spec-Driven Development practices.
+Built with a layered Node.js/TypeScript stack: Controllers handle requests, Services contain business logic, Models define the MongoDB schema. See `TECH-SPEC.md` for full architecture documentation.

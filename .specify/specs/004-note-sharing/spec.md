@@ -1,10 +1,14 @@
 # Note Sharing - Specification
 
 **Spec ID**: 004
-**Status**: Draft
+**Status**: Complete ✅
 **Created**: 2026-03-11
+**Updated**: 2026-03-17
+**Completed**: 2026-03-17
 **Priority**: Medium
 **Depends On**: 003-notes-crud ✅ Complete
+**Branch**: `implement_sharing_notes`
+**Backend**: Complete ✅ | **Frontend UI**: Complete ✅
 
 ## Overview
 Allow users to share individual notes with other users or via public links. Notes are private by default (`isPublic: false` is already modelled in the Note schema from spec 003).

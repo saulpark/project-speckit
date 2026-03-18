@@ -132,7 +132,8 @@ app.use((req, res, next) => {
 app.use('/auth', authRoutes);
 
 // Public note access (no authentication required, but rate limited)
-app.get('/public/notes/:id', NoteController.getPublicNote);
+app.get('/public/notes/:id', NoteController.getPublicNoteView);
+app.get('/api/public/notes/:id', NoteController.getPublicNote);
 
 // Test registration form
 app.get('/test-register', (req: Request, res: Response) => {

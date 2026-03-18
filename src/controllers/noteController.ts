@@ -374,12 +374,38 @@ export class NoteController {
         htmlContent = notePlain.content.preview.replace(/\n/g, '<br>');
       }
 
+      // Prepare sharing data for template
+      let publicUrl = '';
+      if (notePlain.isPublic) {
+        const baseUrl = process.env.PUBLIC_NOTE_BASE_URL || `${req.protocol}://${req.get('host')}`;
+        publicUrl = `${baseUrl}/public/notes/${notePlain._id}`;
+      }
+
+      // Populate shared user details if note owner
+      let populatedSharedWith: any[] = [];
+      if (noteAccess?.isOwner && notePlain.sharedWith && notePlain.sharedWith.length > 0) {
+        try {
+          const populatedNote = await note.populate('sharedWith.userId', 'email _id');
+          populatedSharedWith = populatedNote.sharedWith.map((share: any) => ({
+            userId: share.userId._id,
+            grantedAt: share.grantedAt,
+            user: {
+              email: share.userId.email
+            }
+          }));
+        } catch (err) {
+          console.warn('Error populating shared users:', err);
+          populatedSharedWith = notePlain.sharedWith;
+        }
+      }
+
       res.render('notes/fresh-view', {
         pageTitle: notePlain.title || 'Note',
         note: {
           ...notePlain,
           createdAt: new Date(notePlain.createdAt).toLocaleDateString(),
-          updatedAt: new Date(notePlain.updatedAt).toLocaleDateString()
+          updatedAt: new Date(notePlain.updatedAt).toLocaleDateString(),
+          sharedWith: populatedSharedWith
         },
         htmlContent,
         user,
@@ -388,7 +414,8 @@ export class NoteController {
           isShared: noteAccess?.isShared || false,
           canEdit: noteAccess?.canEdit || false,
           canShare: noteAccess?.canShare || false,
-        }
+        },
+        publicUrl
       });
 
     } catch (error) {
@@ -443,8 +470,8 @@ export class NoteController {
   }
 
   /**
-   * Get a public note (no authentication required)
-   * GET /public/notes/:id
+   * Get a public note (no authentication required) - JSON API
+   * GET /api/public/notes/:id
    */
   static async getPublicNote(req: Request, res: Response): Promise<void> {
     try {
@@ -476,6 +503,80 @@ export class NoteController {
         message: 'An error occurred while retrieving the public note',
         error: 'GET_PUBLIC_NOTE_ERROR',
         timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * Render a public note view (no authentication required)
+   * GET /public/notes/:id
+   */
+  static async getPublicNoteView(req: Request, res: Response): Promise<void> {
+    try {
+      const noteId = String(req.params.id);
+
+      const result = await NoteService.getPublicNote(noteId);
+
+      // Convert note to plain object for template rendering
+      const notePlain = result.note.toObject ? result.note.toObject() : JSON.parse(JSON.stringify(result.note));
+
+      // Convert Quill content to HTML for display
+      let htmlContent = '';
+      if (notePlain.content && notePlain.content.type === 'delta' && notePlain.content.data) {
+        try {
+          if (notePlain.content.data.ops && Array.isArray(notePlain.content.data.ops)) {
+            const converter = new QuillDeltaToHtmlConverter(notePlain.content.data.ops);
+            htmlContent = converter.convert();
+          } else if (typeof notePlain.content.data === 'string') {
+            htmlContent = notePlain.content.data.replace(/\n/g, '<br>');
+          }
+        } catch (e) {
+          console.warn('Error processing note content:', e);
+          // Fallback to plain text rendering
+          if (notePlain.content.data.ops) {
+            htmlContent = notePlain.content.data.ops
+              .filter((op: any) => typeof op.insert === 'string')
+              .map((op: any) => op.insert)
+              .join('').replace(/\n/g, '<br>');
+          } else {
+            htmlContent = notePlain.content.preview || 'Error displaying content';
+          }
+        }
+      } else if (notePlain.content && notePlain.content.preview) {
+        htmlContent = notePlain.content.preview.replace(/\n/g, '<br>');
+      }
+
+      res.render('notes/public-view', {
+        pageTitle: notePlain.title || 'Public Note',
+        note: {
+          ...notePlain,
+          createdAt: new Date(notePlain.createdAt).toLocaleDateString(),
+          updatedAt: new Date(notePlain.updatedAt).toLocaleDateString(),
+        },
+        htmlContent,
+        isPublicView: true
+      });
+
+    } catch (error) {
+      console.error('Get public note view error:', error);
+
+      if (error instanceof Error && error.message === 'Public note not found') {
+        res.status(404).render('error', {
+          pageTitle: 'Note Not Found',
+          error: {
+            status: 404,
+            message: 'This public note was not found or is no longer available.',
+          }
+        });
+        return;
+      }
+
+      res.status(500).render('error', {
+        pageTitle: 'Error',
+        error: {
+          status: 500,
+          message: 'An error occurred while loading this note.',
+        }
       });
     }
   }
