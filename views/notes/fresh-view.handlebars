@@ -53,6 +53,10 @@
             background: #007bff;
             color: white;
         }
+        .btn-share {
+            background: #28a745;
+            color: white;
+        }
         .btn-delete {
             background: #dc3545;
             color: white;
@@ -83,6 +87,160 @@
             font-size: 14px;
             color: #666;
         }
+        .sharing-panel {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        .sharing-panel h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 16px;
+        }
+        .sharing-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .sharing-item:last-child {
+            border-bottom: none;
+        }
+        .sharing-type {
+            font-weight: 500;
+            color: #333;
+        }
+        .sharing-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .public-url-input {
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 250px;
+            font-size: 13px;
+            background: white;
+        }
+        .btn-copy, .btn-revoke, .btn-enable, .btn-remove {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .btn-copy {
+            background: #17a2b8;
+            color: white;
+        }
+        .btn-revoke, .btn-remove {
+            background: #dc3545;
+            color: white;
+        }
+        .btn-enable {
+            background: #28a745;
+            color: white;
+        }
+        .btn-main-menu {
+            background: #6f42c1;
+            color: white;
+        }
+        .btn-logout {
+            background: #fd7e14;
+            color: white;
+        }
+        .shared-users-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-width: 300px;
+        }
+        .shared-user {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 30px;
+            border: none;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .modal-title {
+            margin: 0;
+            font-size: 18px;
+            color: #333;
+        }
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        .form-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -90,8 +248,15 @@
         <div class="header">
             <a href="/notes" class="back-link">← Back to Notes</a>
             <div class="actions">
+                <a href="/dashboard" class="btn btn-main-menu">🏠 Main Menu</a>
+                {{#if access.canShare}}
+                <button onclick="openSharingModal()" class="btn btn-share">🔗 Share</button>
+                {{/if}}
+                {{#if access.canEdit}}
                 <a href="/notes/{{note._id}}/edit" class="btn btn-edit">✏️ Edit</a>
                 <button onclick="deleteNote()" class="btn btn-delete">🗑️ Delete</button>
+                {{/if}}
+                <button onclick="logout()" class="btn btn-logout">🚪 Logout</button>
             </div>
         </div>
 
@@ -102,16 +267,75 @@
         <div class="note-meta">
             <div><strong>Created:</strong> {{note.createdAt}}</div>
             <div><strong>Last Updated:</strong> {{note.updatedAt}}</div>
-            {{#if note.isPublic}}
-            <div><strong>Visibility:</strong> Public</div>
-            {{/if}}
+        </div>
+
+        {{#if access.canShare}}
+        <div class="sharing-panel">
+            <h3>Sharing Settings</h3>
+            <div class="sharing-status">
+                {{#if note.isPublic}}
+                <div class="sharing-item">
+                    <span class="sharing-type">🌐 Public Link</span>
+                    <div class="sharing-actions">
+                        <input type="text" id="publicUrl" value="{{publicUrl}}" readonly class="public-url-input">
+                        <button onclick="copyPublicUrl()" class="btn-copy">Copy</button>
+                        <button onclick="togglePublicSharing()" class="btn-revoke">Revoke</button>
+                    </div>
+                </div>
+                {{else}}
+                <div class="sharing-item">
+                    <span class="sharing-type">🔒 Private Note</span>
+                    <button onclick="togglePublicSharing()" class="btn-enable">Make Public</button>
+                </div>
+                {{/if}}
+
+                {{#if note.sharedWith.length}}
+                <div class="sharing-item">
+                    <span class="sharing-type">👥 Shared Users ({{note.sharedWith.length}})</span>
+                    <div class="shared-users-list">
+                        {{#each note.sharedWith}}
+                        <div class="shared-user">
+                            <span>{{this.user.email}}</span>
+                            <button onclick="unshareWithUser('{{this.userId}}')" class="btn-remove">Remove</button>
+                        </div>
+                        {{/each}}
+                    </div>
+                </div>
+                {{/if}}
+            </div>
+        </div>
+        {{/if}}
+    </div>
+
+    <!-- Sharing Modal -->
+    <div id="sharingModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Share Note</h2>
+                <span class="close" onclick="closeSharingModal()">&times;</span>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Share with User</label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="email" id="shareUserEmail" class="form-input" placeholder="Enter email address" style="flex: 1;">
+                    <button onclick="shareWithUser()" class="btn btn-primary">Share</button>
+                </div>
+                <small style="color: #666; font-size: 12px;">Enter the email address of the user you want to share this note with</small>
+            </div>
+
+            <div class="modal-actions">
+                <button onclick="closeSharingModal()" class="btn btn-secondary">Cancel</button>
+            </div>
         </div>
     </div>
 
     <script>
+        const noteId = '{{note._id}}';
+
         function deleteNote() {
             if (confirm('Are you sure you want to delete this note?')) {
-                fetch('/notes/{{note._id}}', {
+                fetch(`/notes/${noteId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 })
@@ -129,6 +353,153 @@
                 });
             }
         }
+
+        function openSharingModal() {
+            document.getElementById('sharingModal').style.display = 'block';
+        }
+
+        function closeSharingModal() {
+            document.getElementById('sharingModal').style.display = 'none';
+            document.getElementById('shareUserEmail').value = '';
+        }
+
+        function togglePublicSharing() {
+            fetch(`/notes/${noteId}/share/public`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert(`✅ ${result.message}`);
+                    window.location.reload();
+                } else {
+                    alert('❌ Error: ' + result.message);
+                }
+            })
+            .catch(error => {
+                alert('❌ Error: ' + error.message);
+            });
+        }
+
+        function copyPublicUrl() {
+            const urlInput = document.getElementById('publicUrl');
+            urlInput.select();
+            urlInput.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+            alert('✅ Public URL copied to clipboard!');
+        }
+
+        function shareWithUser() {
+            const email = document.getElementById('shareUserEmail').value.trim();
+
+            if (!email) {
+                alert('❌ Please enter an email address');
+                return;
+            }
+
+            if (!isValidEmail(email)) {
+                alert('❌ Please enter a valid email address');
+                return;
+            }
+
+            fetch(`/notes/${noteId}/share/user`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: email })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert('✅ Note shared successfully!');
+                    closeSharingModal();
+                    window.location.reload();
+                } else {
+                    alert('❌ Error: ' + result.message);
+                }
+            })
+            .catch(error => {
+                alert('❌ Error: ' + error.message);
+            });
+        }
+
+        function unshareWithUser(userId) {
+            if (confirm('Are you sure you want to remove this user\'s access to the note?')) {
+                fetch(`/notes/${noteId}/share/user/${userId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('✅ User access removed successfully!');
+                        window.location.reload();
+                    } else {
+                        alert('❌ Error: ' + result.message);
+                    }
+                })
+                .catch(error => {
+                    alert('❌ Error: ' + error.message);
+                });
+            }
+        }
+
+        function isValidEmail(email) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return emailRegex.test(email);
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                fetch('/auth/logout', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        alert('✅ Logged out successfully!');
+                        window.location.href = '/auth/login';
+                    } else {
+                        alert('❌ Error: ' + result.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Logout error:', error);
+                    // Even if there's an error, redirect to login page
+                    window.location.href = '/auth/login';
+                });
+            }
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('sharingModal');
+            if (event.target == modal) {
+                closeSharingModal();
+            }
+        }
+
+        // Handle Enter key in email input
+        document.addEventListener('DOMContentLoaded', function() {
+            const emailInput = document.getElementById('shareUserEmail');
+            if (emailInput) {
+                emailInput.addEventListener('keypress', function(event) {
+                    if (event.key === 'Enter') {
+                        shareWithUser();
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>

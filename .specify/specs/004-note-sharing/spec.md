@@ -1,22 +1,27 @@
 # Note Sharing - Specification
 
 **Spec ID**: 004
-**Status**: Draft
+**Status**: Complete ✅
 **Created**: 2026-03-11
+**Updated**: 2026-03-17
+**Completed**: 2026-03-17
 **Priority**: Medium
 **Depends On**: 003-notes-crud ✅ Complete
+**Branch**: `implement_sharing_notes`
+**Backend**: Complete ✅ | **Frontend UI**: Complete ✅
 
 ## Overview
-Allow users to share individual notes with other users or via public links. Notes are private by default (`isPublic: false` is already modelled in the Note schema from spec 003).
+Allow users to share individual notes with other users or via public links. Notes are private by default and require explicit sharing by the owner to become accessible to others.
 
 ## Requirements
 
 ### FR-001: Share Note via Public Link
 - **Description**: Note owner can generate a shareable public link
 - **Acceptance Criteria**:
-  - Toggle `isPublic: true` on a note exposes it at a public URL
-  - Public notes readable without authentication
-  - Owner can revoke sharing at any time (set `isPublic: false`)
+  - Owner can make a note publicly accessible via a shareable URL
+  - Public notes are readable by anyone without requiring account registration
+  - Owner can revoke public access at any time, making the note private again
+  - Public URLs remain stable and do not expose sensitive information
 - **Priority**: High
 
 ### FR-002: Share Note with Specific User
@@ -44,11 +49,15 @@ Allow users to share individual notes with other users or via public links. Note
 ## Dependencies
 
 ### Feature Dependencies
-- 001-authentication — user identity and JWT middleware
-- 003-notes-crud — Note model (`isPublic` field, `NoteService`)
+- 001-authentication — user identity and access control
+- 003-notes-crud — existing note management functionality
 
-### New Fields Required
-- `Note.sharedWith: [{ userId: ObjectId, grantedAt: Date }]`
+### Technical Implementation
+See [technical-implementation.md](./technical-implementation.md) for:
+- Database schema extensions
+- API endpoint specifications
+- Security architecture
+- Frontend implementation details
 
 ## Future Enhancements
 - Shared note editing (collaborative)

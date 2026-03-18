@@ -40,7 +40,7 @@ router.get('/test-ui', (req: Request, res: Response) => {
 router.get('/', authenticateWeb, NoteController.getNotesView);
 router.get('/shared-with-me', authenticateWeb, NoteController.getSharedNotesView);
 router.get('/new', authenticateWeb, NoteController.getCreateForm);
-router.get('/:id/view', authenticateWeb, verifyNoteOwnership, NoteController.getShowView);
+router.get('/:id/view', authenticateWeb, verifyNoteAccessOrShared, NoteController.getShowView);
 // Fresh edit route - bypassing old problematic code
 router.get('/:id/edit', authenticateWeb, verifyNoteOwnership, NoteController.getEditForm);
 

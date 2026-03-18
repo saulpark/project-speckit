@@ -13,9 +13,17 @@
           📤 Shared with me
         </a>
       </div>
-      <a href="/notes/new" class="btn btn-primary" style="display: inline-block; padding: 0.5rem 1rem; background: var(--primary, #4361ee); color: white; text-decoration: none; border-radius: 4px;">
-        + New Note
-      </a>
+      <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <a href="/dashboard" style="display: inline-block; padding: 0.5rem 1rem; background: #6f42c1; color: white; text-decoration: none; border-radius: 4px;">
+          🏠 Main Menu
+        </a>
+        <a href="/notes/new" class="btn btn-primary" style="display: inline-block; padding: 0.5rem 1rem; background: var(--primary, #4361ee); color: white; text-decoration: none; border-radius: 4px;">
+          + New Note
+        </a>
+        <button onclick="logout()" style="display: inline-block; padding: 0.5rem 1rem; background: #fd7e14; color: white; border: none; text-decoration: none; border-radius: 4px; cursor: pointer;">
+          🚪 Logout
+        </button>
+      </div>
     </div>
     <h1 style="margin: 0;">{{#if isSharedView}}Shared with me{{else}}My Notes{{/if}}</h1>
   </div>
@@ -280,5 +288,31 @@ function highlightSearchTerms(searchTerm) {
       element.innerHTML = element.innerHTML.replace(regex, '<mark style="background: #fef08a; padding: 0.125rem;">$1</mark>');
     }
   });
+}
+
+function logout() {
+  if (confirm('Are you sure you want to logout?')) {
+    fetch('/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => response.json())
+    .then(result => {
+      if (result.success) {
+        alert('✅ Logged out successfully!');
+        window.location.href = '/auth/login';
+      } else {
+        alert('❌ Error: ' + result.message);
+      }
+    })
+    .catch(error => {
+      console.error('Logout error:', error);
+      // Even if there's an error, redirect to login page
+      window.location.href = '/auth/login';
+    });
+  }
 }
 </script>
