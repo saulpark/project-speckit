@@ -2,7 +2,6 @@ node_modules
 dist
 .git
 .gitignore
-README.md
 .env
 .env.*
 docker-compose.yml
@@ -13,4 +12,3 @@ coverage/
 .nyc_output
 .claude/
 .specify/
-MIGRATION_PROGRESS.md

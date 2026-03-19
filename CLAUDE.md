@@ -4,7 +4,7 @@
 This is a Node.js/TypeScript note-taking application with JWT authentication, rich text note CRUD, and note sharing features. Backend is MongoDB with Mongoose ODM. Templating uses Handlebars with Quill.js for rich text editing.
 
 ## Spec-Kit Methodology
-All features follow Spec-Driven Development. The authoritative source of truth for feature requirements, plans, and task status is the `.specify/` directory. Root-level `.md` files must stay in sync with `.specify/` contents.
+All features follow Spec-Driven Development. The authoritative source of truth for feature requirements, plans, and task status is the `.specify/` directory. Root-level documentation files (`README.md`, `CLAUDE.md`, `AUDIT.md`, `TECH-SPEC.MD`) must stay in sync with `.specify/` contents.
 
 ## Architecture
 ```
@@ -41,10 +41,12 @@ src/
 │   ├── profileRoutes.ts           # All /profile/* routes (web + API); rate limiting for password changes
 │   ├── adminRoutes.ts             # All /admin/* routes (web + API); admin rate limiting
 │   └── testEditRoutes.ts          # Debug/test routes (dev only)
-└── utils/
-    ├── jwt.ts                     # JWT generation and verification
-    ├── crypto.ts                  # Password hashing utilities
-    └── contentProcessor.ts        # Quill Delta processing: textToDelta, sanitizeContent, deltaToPreview
+├── utils/
+│   ├── jwt.ts                     # JWT generation and verification
+│   ├── crypto.ts                  # Password hashing utilities
+│   └── contentProcessor.ts        # Quill Delta processing: textToDelta, sanitizeContent, deltaToPreview
+└── types/
+    └── express.d.ts               # Express Request type augmentation (req.user, req.note, req.noteAccess)
 ```
 
 ## Views (Handlebars)
@@ -59,6 +61,8 @@ views/
 │   ├── login.handlebars
 │   └── register.handlebars
 ├── dashboard.handlebars
+├── error.handlebars               # Generic error page
+├── test.handlebars                # Dev/test view (dev only)
 ├── profile/
 │   └── index.handlebars           # User profile page: display name edit, password change form, user stats
 ├── admin/
@@ -152,7 +156,7 @@ A plain `docker-compose restart` does not pick up new TypeScript builds.
 | 001 | Authentication | Complete |
 | 002 | Logout Enhancement (token blacklisting) | Complete |
 | 003 | Notes CRUD | Complete |
-| 004 | Note Sharing | Complete (backend + UI; branch: `implement_sharing_notes`) |
+| 004 | Note Sharing | Complete (backend + UI fully implemented; branch: `implement_sharing_notes`) |
 | 005 | User Management | In Progress — Phase 1 (Profile), Phase 2 (Password Change), Phase 3 (Admin Interface) implemented; Phase 4 (Testing) pending |
 
 ## Quality Assurance

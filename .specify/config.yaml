@@ -1,7 +1,7 @@
 # Spec-Kit Configuration
 project:
   name: "project-speckit"
-  description: "Authentication system with comprehensive JWT session management"
+  description: "Full-stack note-taking application with JWT authentication, rich text editing, note sharing, and user management"
   version: "1.0.0"
 
 ai:
